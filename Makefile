@@ -35,9 +35,8 @@ build:
 migrate:
 	docker compose run --rm --entrypoint alembic app upgrade head
 
-# Integration tests need the schema; the app container migrates on start, but
-# `run --entrypoint pytest` bypasses that, so migrate explicitly first.
-test: migrate
+# Tests create and migrate their own database, so no `migrate` dependency here.
+test:
 	docker compose run --rm --entrypoint pytest app -q
 
 lint:

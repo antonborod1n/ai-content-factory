@@ -63,6 +63,10 @@ $env:DATABASE_URL = "postgresql+asyncpg://acf:<your-password>@localhost:5432/acf
 Alternatively export `POSTGRES_PASSWORD` (plus optional `POSTGRES_USER` /
 `POSTGRES_DB`) and `tests/conftest.py` builds the `localhost:5432` URL for you.
 
+Tests truncate tables, so they never touch the application database: the suite
+derives `<database>_test` (e.g. `acf_test`), creates it if missing and migrates
+it on first use. Override with `TEST_DATABASE_URL` if you need another target.
+
 ```bash
 make test
 make lint

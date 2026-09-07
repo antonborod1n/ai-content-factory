@@ -1,12 +1,16 @@
 """Shared pytest fixtures."""
 
 import os
+import subprocess
+import sys
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests.db_setup import derive_test_database_url
 
 # When tests run on the host, point them at Compose-published Postgres using the
 # POSTGRES_* values from the environment. Credentials never live in code.
@@ -18,6 +22,10 @@ if "DATABASE_URL" not in os.environ and os.environ.get("POSTGRES_PASSWORD"):
         f"postgresql+asyncpg://{_user}:{_password}@localhost:5432/{_database}"
     )
 
+# Tests truncate tables, so they always run against a separate database.
+if "DATABASE_URL" in os.environ:
+    os.environ["DATABASE_URL"] = derive_test_database_url(os.environ["DATABASE_URL"])
+
 from app.config import get_settings
 from app.db.session import (
     dispose_engine,
@@ -27,6 +35,20 @@ from app.db.session import (
 )
 from app.main import create_app
 from app.repositories.article_repository import ArticleRepository
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _prepare_test_database() -> None:
+    """Create the test database and migrate it once per session.
+
+    Runs in a subprocess so Alembic's own event loop cannot clash with the
+    pytest-asyncio loop.
+    """
+    subprocess.run(
+        [sys.executable, "-m", "tests.db_setup"],
+        check=True,
+        capture_output=True,
+    )
 
 
 @pytest.fixture(autouse=True)

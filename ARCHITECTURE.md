@@ -494,6 +494,7 @@ word_count: int   # accepted from model but NOT trusted for persistence
 - **No real OpenAI key required** for CI or local default test runs.
 - Prefer `MockAIWriter` everywhere except optional manual smoke tests.
 - Use a real PostgreSQL when possible for integration (Docker Compose test DB or pytest fixture with ephemeral DB); alternatively Testcontainers / compose `postgres` service. SQLite is **discouraged** because of JSONB and parity with production.
+- **Implemented:** the suite runs against a dedicated database on the same server (`<database>_test`, override via `TEST_DATABASE_URL`), created and migrated by `tests/db_setup.py`. Since fixtures truncate tables, the application database must never be the test target.
 
 ### 8.2 Unit tests
 
