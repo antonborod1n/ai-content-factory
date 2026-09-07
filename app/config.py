@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str | None = None
     openai_temperature: float = 0.4
-    openai_max_tokens: int | None = 4000
+    # ~1800 words of Russian markdown needs well over 4000 completion tokens.
+    openai_max_tokens: int | None = 8000
     article_target_word_count: int = 1800
     prompts_dir: str | None = None
 
