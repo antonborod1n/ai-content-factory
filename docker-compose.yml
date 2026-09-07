@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-acf}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-acf_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-acf}
     ports:
       - "5432:5432"
@@ -22,7 +22,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://acf:acf_secret@postgres:5432/acf}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       PROMPTS_DIR: /app/prompts
     volumes:
       - ./app:/app/app

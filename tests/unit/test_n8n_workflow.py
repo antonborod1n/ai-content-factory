@@ -104,7 +104,6 @@ def test_workflow_contains_no_secrets_or_credentials() -> None:
         "authorization",
         "credentials",
         "password",
-        "acf_secret",
         "postgresql://",
         "postgresql+asyncpg",
     ):

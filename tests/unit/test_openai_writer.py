@@ -39,7 +39,7 @@ def _settings(
         openai_temperature=temperature,
         openai_max_tokens=max_tokens,
         article_target_word_count=target_word_count,
-        database_url="postgresql+asyncpg://acf:acf_secret@localhost:5432/acf",
+        database_url="postgresql+asyncpg://localhost/test",
     )
 
 

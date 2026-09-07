@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Response, status
 
-from app.db.session import check_database_connection
+from app.api.deps import DatabaseHealthDep
 from app.schemas.health import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -14,8 +14,10 @@ router = APIRouter(tags=["health"])
         503: {"description": "Database is unavailable"},
     },
 )
-async def health(response: Response) -> HealthResponse:
-    database_ok = await check_database_connection()
+async def health(
+    response: Response,
+    database_ok: DatabaseHealthDep,
+) -> HealthResponse:
     if database_ok:
         return HealthResponse(status="ok", database="ok")
 

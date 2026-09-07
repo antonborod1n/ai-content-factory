@@ -16,11 +16,14 @@ from app.services.ai.mock_writer import MockAIWriter
 ENDPOINT = "/api/v1/articles/generate"
 
 
+LEAKY_SECRET = "fake-password-must-not-leak"
+
+
 class ExplodingWriter:
     """Writer raising a non-AI error with sensitive text."""
 
     async def generate(self, request: ArticleWriteInput) -> AIArticleOutput:
-        raise RuntimeError("postgresql://acf:acf_secret@db/acf unreachable")
+        raise RuntimeError(f"postgresql://acf:{LEAKY_SECRET}@db/acf unreachable")
 
 
 def _use_writer(api_app: FastAPI, writer: object) -> None:
@@ -138,6 +141,6 @@ async def test_generate_returns_500_and_hides_internal_details(
 
     assert response.status_code == 500
     raw_body = response.text
-    assert "acf_secret" not in raw_body
+    assert LEAKY_SECRET not in raw_body
     assert "Traceback" not in raw_body
     assert response.json()["detail"] == "Article generation failed"

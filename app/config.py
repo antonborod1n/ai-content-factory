@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     app_env: str = "local"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
-    database_url: str = "postgresql+asyncpg://acf:acf_secret@localhost:5432/acf"
+    # Required: credentials must come from the environment, never from code.
+    database_url: str
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str | None = None

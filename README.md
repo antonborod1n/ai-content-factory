@@ -1,6 +1,7 @@
 # AI Content Factory
 
-Automated B2B article production system. This repository currently implements the **Stage 1 skeleton**: FastAPI + PostgreSQL with a working health check.
+Automated B2B article production system. This repository implements **Stage 1**:
+FastAPI + PostgreSQL generating articles through an AI provider, callable from n8n.
 
 ## Stack
 
@@ -15,11 +16,15 @@ Automated B2B article production system. This repository currently implements th
 
 ## Quick start
 
-1. Copy environment file:
+1. Copy the environment file and fill it in:
 
 ```bash
 cp .env.example .env
 ```
+
+Set your own `POSTGRES_PASSWORD`, keep `DATABASE_URL` in sync with it, and add
+`OPENAI_API_KEY`. Compose refuses to start if `POSTGRES_PASSWORD` or
+`DATABASE_URL` is missing — no credentials are hardcoded anywhere.
 
 2. Start services (the app container applies Alembic migrations on start):
 
@@ -51,11 +56,12 @@ pip install -e ".[dev]"
 For local pytest against Compose Postgres, set:
 
 ```bash
-# Windows PowerShell
-$env:DATABASE_URL = "postgresql+asyncpg://acf:acf_secret@localhost:5432/acf"
+# Windows PowerShell — use the password from your own .env
+$env:DATABASE_URL = "postgresql+asyncpg://acf:<your-password>@localhost:5432/acf"
 ```
 
-Or rely on `tests/conftest.py` defaults (`localhost:5432`).
+Alternatively export `POSTGRES_PASSWORD` (plus optional `POSTGRES_USER` /
+`POSTGRES_DB`) and `tests/conftest.py` builds the `localhost:5432` URL for you.
 
 ```bash
 make test

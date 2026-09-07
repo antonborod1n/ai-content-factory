@@ -46,11 +46,16 @@ class FakeArticleRepository:
         return article
 
 
+LEAKY_SECRET = "fake-password-must-not-leak"
+
+
 class ExplodingWriter:
     """Writer that raises a non-AI error containing sensitive text."""
 
     async def generate(self, request: ArticleWriteInput) -> AIArticleOutput:
-        raise RuntimeError("connection to postgresql://acf:acf_secret@db failed")
+        raise RuntimeError(
+            f"connection to postgresql://acf:{LEAKY_SECRET}@db failed"
+        )
 
 
 def _request(**overrides: Any) -> ArticleWriteInput:
@@ -197,9 +202,9 @@ async def test_generate_wraps_unexpected_error_with_safe_message() -> None:
 
     message = str(exc_info.value)
     assert message == "Article generation failed"
-    assert "acf_secret" not in message
+    assert LEAKY_SECRET not in message
 
     article = next(iter(repository.articles.values()))
     assert article.status is ArticleStatus.FAILED
     assert article.error_message == "Article generation failed"
-    assert "acf_secret" not in article.error_message
+    assert LEAKY_SECRET not in article.error_message

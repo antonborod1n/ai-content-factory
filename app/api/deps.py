@@ -5,13 +5,21 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db_session
+from app.db.session import check_database_connection, get_db_session
 from app.repositories.article_repository import ArticleRepository
 from app.services.ai.base import AIWriter
 from app.services.ai.openai_writer import OpenAIWriter
 from app.services.article_service import ArticleService
 
 SessionDep = Annotated[AsyncSession, Depends(get_db_session)]
+
+
+async def get_database_health() -> bool:
+    """True when the database answers a trivial query."""
+    return await check_database_connection()
+
+
+DatabaseHealthDep = Annotated[bool, Depends(get_database_health)]
 
 
 def get_article_repository(session: SessionDep) -> ArticleRepository:

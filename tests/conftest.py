@@ -8,11 +8,15 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Prefer localhost when tests run on the host against Compose-published Postgres.
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+asyncpg://acf:acf_secret@localhost:5432/acf",
-)
+# When tests run on the host, point them at Compose-published Postgres using the
+# POSTGRES_* values from the environment. Credentials never live in code.
+if "DATABASE_URL" not in os.environ and os.environ.get("POSTGRES_PASSWORD"):
+    _user = os.environ.get("POSTGRES_USER", "acf")
+    _database = os.environ.get("POSTGRES_DB", "acf")
+    _password = os.environ["POSTGRES_PASSWORD"]
+    os.environ["DATABASE_URL"] = (
+        f"postgresql+asyncpg://{_user}:{_password}@localhost:5432/{_database}"
+    )
 
 from app.config import get_settings
 from app.db.session import (
