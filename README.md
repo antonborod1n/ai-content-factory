@@ -106,6 +106,35 @@ docker compose run --rm -e PYTHONPATH=/app -v ${PWD}/scripts:/app/scripts \
     --entrypoint python app scripts/smoke_openai.py
 ```
 
+## n8n workflow
+
+`n8n/workflows/stage1_generate_article.json` is an importable workflow:
+
+```text
+Manual Trigger -> Set Article Parameters -> Generate Article (HTTP) -> IF Success -> Result / Error Result
+```
+
+It only supplies `topic`, `language`, `audience`, `keywords` and displays the
+response; all generation logic and the provider key stay in the backend.
+
+Import it via **Workflows -> Import from File** in the n8n UI. If you do not
+have n8n installed, run it next to the API:
+
+```bash
+docker run -d --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n
+```
+
+Then open <http://localhost:5678>, import the file, edit the topic in
+**Set Article Parameters** and press **Execute Workflow**.
+
+Adjust the URL in **Generate Article** to match where n8n runs:
+
+| n8n runs | URL |
+| --- | --- |
+| On the host | `http://localhost:8000/api/v1/articles/generate` |
+| In Docker (Windows/macOS) | `http://host.docker.internal:8000/api/v1/articles/generate` |
+| In this Compose project | `http://app:8000/api/v1/articles/generate` |
+
 ## Project layout
 
 ```text
@@ -113,7 +142,7 @@ app/           FastAPI application (layered architecture)
 tests/         Unit, API, and integration tests
 prompts/       AI prompt templates
 scripts/       Manual smoke checks (not part of the test suite)
-n8n/           Workflow exports (later)
+n8n/workflows/ Exported workflow JSON (no secrets)
 alembic/       Database migrations
 ```
 
@@ -133,7 +162,4 @@ Implemented:
 - AI layer: `AIWriter` protocol, `OpenAIWriter`, `MockAIWriter`, prompt loading
 - `ArticleService` (generation orchestration and status transitions)
 - `POST /api/v1/articles/generate`
-
-Not yet implemented (next assignments):
-
-- n8n workflow
+- n8n workflow export for manual generation

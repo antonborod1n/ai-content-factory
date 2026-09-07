@@ -14,6 +14,7 @@ COPY app ./app
 COPY tests ./tests
 COPY alembic ./alembic
 COPY prompts ./prompts
+COPY n8n ./n8n
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir ".[dev]"

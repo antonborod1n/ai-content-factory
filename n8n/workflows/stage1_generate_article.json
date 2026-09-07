@@ -1,0 +1,259 @@
+{
+  "name": "Stage 1 - Generate Article",
+  "active": false,
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-220, 0],
+      "parameters": {}
+    },
+    {
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Set Article Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [0, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000001",
+              "name": "topic",
+              "value": "Как выбрать промышленный насос",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000002",
+              "name": "language",
+              "value": "ru",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000003",
+              "name": "audience",
+              "value": "Инженеры и закупщики",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000004",
+              "name": "keywords",
+              "value": "={{ [\"промышленный насос\", \"как выбрать насос\"] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Article parameters only. All generation logic lives in the backend."
+    },
+    {
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Generate Article",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/v1/articles/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ topic: $json.topic, language: $json.language, audience: $json.audience, keywords: $json.keywords }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 180000
+        }
+      },
+      "notes": "neverError + fullResponse keep the status code available for the IF branch. The backend holds all provider secrets."
+    },
+    {
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "IF Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c0000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, -120],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b0000000-0000-4000-8000-000000000001",
+              "name": "id",
+              "value": "={{ $json.body.id }}",
+              "type": "string"
+            },
+            {
+              "id": "b0000000-0000-4000-8000-000000000002",
+              "name": "status",
+              "value": "={{ $json.body.status }}",
+              "type": "string"
+            },
+            {
+              "id": "b0000000-0000-4000-8000-000000000003",
+              "name": "title",
+              "value": "={{ $json.body.title }}",
+              "type": "string"
+            },
+            {
+              "id": "b0000000-0000-4000-8000-000000000004",
+              "name": "meta_description",
+              "value": "={{ $json.body.meta_description }}",
+              "type": "string"
+            },
+            {
+              "id": "b0000000-0000-4000-8000-000000000005",
+              "name": "word_count",
+              "value": "={{ $json.body.word_count }}",
+              "type": "number"
+            },
+            {
+              "id": "b0000000-0000-4000-8000-000000000006",
+              "name": "content_markdown",
+              "value": "={{ $json.body.content_markdown }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "Pass-through of the backend response."
+    },
+    {
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Error Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 120],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e0000000-0000-4000-8000-000000000001",
+              "name": "http_status",
+              "value": "={{ $json.statusCode }}",
+              "type": "number"
+            },
+            {
+              "id": "e0000000-0000-4000-8000-000000000002",
+              "name": "detail",
+              "value": "={{ $json.body.detail }}",
+              "type": "string"
+            },
+            {
+              "id": "e0000000-0000-4000-8000-000000000003",
+              "name": "id",
+              "value": "={{ $json.body.id }}",
+              "type": "string"
+            },
+            {
+              "id": "e0000000-0000-4000-8000-000000000004",
+              "name": "status",
+              "value": "={{ $json.body.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "notes": "422 has no id/status; 500 and 502 carry the failed article id."
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Article Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Article Parameters": {
+      "main": [
+        [
+          {
+            "node": "Generate Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Article": {
+      "main": [
+        [
+          {
+            "node": "IF Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Success": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

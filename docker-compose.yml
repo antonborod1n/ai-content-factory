@@ -29,6 +29,7 @@ services:
       - ./tests:/app/tests
       - ./alembic:/app/alembic
       - ./prompts:/app/prompts
+      - ./n8n:/app/n8n
       - ./pyproject.toml:/app/pyproject.toml
     depends_on:
       postgres:
