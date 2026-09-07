@@ -1,0 +1,29 @@
+# Version control and local secrets
+.git
+.gitignore
+.gitattributes
+.env
+.env.local
+
+# Local tooling and caches
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# Editor and agent config
+.cursor
+.idea
+.vscode
+
+# Docs not needed inside the image (README.md is required by the build)
+PROJECT.md
+ARCHITECTURE.md
+
+# Local data
+postgres_data

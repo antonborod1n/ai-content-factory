@@ -1,0 +1,35 @@
+---
+description: Stage 1 architecture and scope rules for AI Content Factory
+alwaysApply: true
+---
+
+# AI Content Factory — Stage 1 Rules
+
+Follow `PROJECT.md` and `ARCHITECTURE.md`.
+
+## Layering
+
+- API routes: HTTP, validation, response mapping, DI only — no business logic, no OpenAI, no SQL.
+- Services: orchestration and domain rules only.
+- AI layer (`app/services/ai/`): only place that may call AI providers, via `AIWriter` abstraction.
+- Repositories: PostgreSQL only — no business logic, no AI calls.
+
+## Stage 1 scope
+
+Implement only what the current assignment requests. Do **not** add without an explicit task:
+
+- RAG / pgvector / document processing
+- SEO, CMS, publishing, images, internal linking
+- Multi-agent systems
+- Frontend / dashboard / authentication / billing
+- Redis / Kafka / workers / Kubernetes / cloud deployment
+
+## Secrets
+
+Never put API keys, DB credentials, or secrets in source, prompts, n8n workflows, logs, README, or API responses. Use environment variables only.
+
+## Quality
+
+- New behavior must have tests.
+- Prefer simple, maintainable code over premature abstractions.
+- Prefer async SQLAlchemy + asyncpg as configured for this project.
