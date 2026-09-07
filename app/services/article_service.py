@@ -5,7 +5,12 @@ from __future__ import annotations
 import logging
 import uuid
 
-from app.core.exceptions import AIError, ArticleGenerationError
+from app.core.exceptions import (
+    AIConfigurationError,
+    AIError,
+    ArticleGenerationError,
+    ArticleGenerationUpstreamError,
+)
 from app.core.word_count import count_words
 from app.db.models.article import Article, ArticleStatus
 from app.repositories.article_repository import ArticleRepository
@@ -42,13 +47,26 @@ class ArticleService:
 
         try:
             output = await self._writer.generate(request)
+        except AIConfigurationError as exc:
+            logger.exception("AI provider is not configured")
+            await self._mark_failed(article.id, _GENERIC_FAILURE_MESSAGE)
+            raise ArticleGenerationError(
+                _GENERIC_FAILURE_MESSAGE,
+                article_id=article.id,
+            ) from exc
         except AIError as exc:
             await self._mark_failed(article.id, exc.message)
-            raise
+            raise ArticleGenerationUpstreamError(
+                exc.message,
+                article_id=article.id,
+            ) from exc
         except Exception as exc:
             logger.exception("Unexpected error while generating article")
             await self._mark_failed(article.id, _GENERIC_FAILURE_MESSAGE)
-            raise ArticleGenerationError(_GENERIC_FAILURE_MESSAGE) from exc
+            raise ArticleGenerationError(
+                _GENERIC_FAILURE_MESSAGE,
+                article_id=article.id,
+            ) from exc
 
         completed = await self._repository.update(
             article.id,
@@ -60,7 +78,10 @@ class ArticleService:
             error_message=None,
         )
         if completed is None:
-            raise ArticleGenerationError(_GENERIC_FAILURE_MESSAGE)
+            raise ArticleGenerationError(
+                _GENERIC_FAILURE_MESSAGE,
+                article_id=article.id,
+            )
         return completed
 
     async def _mark_failed(self, article_id: uuid.UUID, message: str) -> None:

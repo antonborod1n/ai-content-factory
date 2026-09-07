@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AIProviderError
+from app.core.exceptions import AIProviderError, ArticleGenerationUpstreamError
 from app.core.word_count import count_words
 from app.db.models.article import ArticleStatus
 from app.repositories.article_repository import ArticleRepository
@@ -58,7 +58,7 @@ async def test_failed_article_is_stored_with_safe_message(
     writer = MockAIWriter(fail_with=AIProviderError())
     service = ArticleService(article_repository, writer)
 
-    with pytest.raises(AIProviderError):
+    with pytest.raises(ArticleGenerationUpstreamError):
         await service.generate(_request())
 
     row = (

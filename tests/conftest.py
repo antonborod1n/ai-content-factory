@@ -3,6 +3,7 @@
 import os
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,9 +37,14 @@ async def _reset_db_engine() -> None:
 
 
 @pytest.fixture
-async def client() -> AsyncClient:
-    application = create_app()
-    transport = ASGITransport(app=application)
+def api_app() -> FastAPI:
+    """Fresh application instance; tests may set dependency_overrides on it."""
+    return create_app()
+
+
+@pytest.fixture
+async def client(api_app: FastAPI) -> AsyncClient:
+    transport = ASGITransport(app=api_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 

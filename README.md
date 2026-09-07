@@ -62,6 +62,35 @@ make test
 make lint
 ```
 
+## API
+
+`POST /api/v1/articles/generate`
+
+```json
+{
+  "topic": "Как выбрать промышленный насос",
+  "language": "ru",
+  "audience": "Инженеры и закупщики",
+  "keywords": ["промышленный насос"]
+}
+```
+
+Only `topic` is required; `language`, `audience` and `keywords` default to
+`ru`, `general` and `[]`. On success the response is `200` with `id`, `status`,
+`title`, `meta_description`, `content_markdown` and a backend-recalculated
+`word_count`.
+
+Failures return a sanitized body (`detail`, `id`, `status: failed`) and the row
+is stored with status `failed`:
+
+| Status | Cause |
+| --- | --- |
+| 422 | Invalid request body |
+| 502 | AI provider error or invalid AI response |
+| 500 | Unexpected application error or misconfigured provider |
+
+Interactive docs: <http://localhost:8000/docs>
+
 ## AI provider
 
 `OpenAIWriter` reads `OPENAI_API_KEY` and `OPENAI_MODEL` from the environment.
@@ -98,13 +127,13 @@ alembic/       Database migrations
 Implemented:
 
 - Project skeleton
-- Docker Compose (`app` + `postgres`)
+- Docker Compose (`app` + `postgres`), migrations applied on container start
 - `GET /health` with database connectivity check
 - `articles` table, Alembic migration, `ArticleRepository`
 - AI layer: `AIWriter` protocol, `OpenAIWriter`, `MockAIWriter`, prompt loading
+- `ArticleService` (generation orchestration and status transitions)
+- `POST /api/v1/articles/generate`
 
 Not yet implemented (next assignments):
 
-- `ArticleService` (generation orchestration)
-- `POST /api/v1/articles/generate`
 - n8n workflow

@@ -1,5 +1,7 @@
 """Application-specific exceptions."""
 
+import uuid
+
 
 class AppError(Exception):
     """Base application error with a safe, user-facing message."""
@@ -10,10 +12,20 @@ class AppError(Exception):
 
 
 class ArticleGenerationError(AppError):
-    """Article generation failed for a reason that is not AI-specific."""
+    """Article generation failed inside the application."""
 
-    def __init__(self, message: str = "Article generation failed") -> None:
+    def __init__(
+        self,
+        message: str = "Article generation failed",
+        *,
+        article_id: uuid.UUID | None = None,
+    ) -> None:
+        self.article_id = article_id
         super().__init__(message)
+
+
+class ArticleGenerationUpstreamError(ArticleGenerationError):
+    """Article generation failed because of the AI provider or its response."""
 
 
 class AIError(AppError):

@@ -6,9 +6,11 @@ from typing import Any
 import pytest
 
 from app.core.exceptions import (
+    AIConfigurationError,
     AIProviderError,
     AIValidationError,
     ArticleGenerationError,
+    ArticleGenerationUpstreamError,
 )
 from app.core.word_count import count_words
 from app.db.models.article import Article, ArticleStatus
@@ -133,10 +135,12 @@ async def test_generate_marks_failed_on_ai_provider_error() -> None:
     repository = FakeArticleRepository()
     service = ArticleService(repository, MockAIWriter(fail_with=AIProviderError()))
 
-    with pytest.raises(AIProviderError):
+    with pytest.raises(ArticleGenerationUpstreamError) as exc_info:
         await service.generate(_request())
 
     article = next(iter(repository.articles.values()))
+    assert exc_info.value.article_id == article.id
+    assert isinstance(exc_info.value.__cause__, AIProviderError)
     assert article.status is ArticleStatus.FAILED
     assert article.error_message == (
         "Article generation failed due to an AI provider error"
@@ -156,13 +160,31 @@ async def test_generate_marks_failed_on_invalid_ai_output() -> None:
     writer = MockAIWriter(invalid_payload={"title": "Only title"})
     service = ArticleService(repository, writer)
 
-    with pytest.raises(AIValidationError):
+    with pytest.raises(ArticleGenerationUpstreamError) as exc_info:
         await service.generate(_request())
 
     article = next(iter(repository.articles.values()))
+    assert isinstance(exc_info.value.__cause__, AIValidationError)
     assert article.status is ArticleStatus.FAILED
     assert article.error_message == "AI response failed validation"
     assert article.title is None
+
+
+@pytest.mark.asyncio
+async def test_generate_treats_misconfiguration_as_internal_error() -> None:
+    repository = FakeArticleRepository()
+    writer = MockAIWriter(fail_with=AIConfigurationError())
+    service = ArticleService(repository, writer)
+
+    with pytest.raises(ArticleGenerationError) as exc_info:
+        await service.generate(_request())
+
+    assert not isinstance(exc_info.value, ArticleGenerationUpstreamError)
+    assert str(exc_info.value) == "Article generation failed"
+
+    article = next(iter(repository.articles.values()))
+    assert article.status is ArticleStatus.FAILED
+    assert article.error_message == "Article generation failed"
 
 
 @pytest.mark.asyncio
