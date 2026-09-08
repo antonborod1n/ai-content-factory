@@ -45,7 +45,7 @@ RAG, vectors, research/SEO, multi-agent orchestration, CMS, images, auth, Redis,
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  n8n (external orchestrator — Manual Trigger only)      │
+│  n8n (Compose service — Manual Trigger only)            │
 └───────────────────────────┬─────────────────────────────┘
                             │ HTTP JSON
 ┌───────────────────────────▼─────────────────────────────┐
@@ -119,7 +119,10 @@ ai-content-factory/
 ├── Dockerfile
 │
 ├── prompts/
-│   └── article_writer.md     # writer system/user prompt template
+│   ├── article_writer.md     # whole article in one request
+│   ├── article_meta.md       # title / meta description / slug
+│   ├── article_section.md    # one outline section
+│   └── article_expand.md     # grow a draft that came back too short
 │
 ├── alembic/
 │   ├── env.py
@@ -154,6 +157,7 @@ ai-content-factory/
 │   │   ├── base.py           # AIWriter protocol / ABC
 │   │   ├── openai_writer.py  # OpenAIWriter
 │   │   ├── mock_writer.py    # MockAIWriter
+│   │   ├── section_plan.py   # split a brief into per-section tasks
 │   │   └── prompt_loader.py  # load prompts from prompts/
 │   │
 │   ├── repositories/
@@ -256,9 +260,10 @@ Owns the Stage 1 generation **orchestration** (PROJECT.md §7):
 | Component | Responsibility |
 |-----------|----------------|
 | `AIWriter` | Protocol/ABC: input topic context → structured article fields |
-| `OpenAIWriter` | Call OpenAI Chat Completions (or Responses) with structured JSON; load prompt from file |
+| `OpenAIWriter` | Call OpenAI Chat Completions with structured JSON; one request per outline section, or a single request plus expansion passes when the brief has no outline |
 | `MockAIWriter` | Deterministic fake output for unit/API/integration tests |
-| `prompt_loader` | Read `prompts/article_writer.md`; optional lightweight template substitution for topic/language/audience/keywords |
+| `section_plan` | Turn a brief into per-section word budgets and placeholder numbering |
+| `prompt_loader` | Read prompt files and substitute brief/section placeholders |
 
 **Forbidden in AI layer:** persistence, status transitions, FastAPI types.
 
@@ -553,9 +558,10 @@ Assert end-to-end persistence and response fields. Still **no** real OpenAI.
 services:
   app        # FastAPI (uvicorn)
   postgres   # PostgreSQL 16 (or 15+)
+  n8n        # thin HTTP orchestrator UI (no provider secrets)
 ```
 
-Optional later (not Stage 1): `n8n`, `redis`, `worker`.
+Optional later: `redis`, `worker`.
 
 ### 9.2 `app` container
 
@@ -574,14 +580,14 @@ Optional later (not Stage 1): `n8n`, `redis`, `worker`.
 
 ### 9.4 Networking
 
-- Internal Docker network: `app` connects to `postgres` hostname.
-- Host access: `localhost:8000` → API; n8n (host-installed or future container) calls that URL.
+- Internal Docker network: `app` connects to `postgres` hostname; `n8n` calls `http://app:8000/...`.
+- Host access: `localhost:8000` → API; `localhost:5678` → n8n UI.
 - **Do not** publish Postgres to the public internet in examples; publish only if needed for local tools (bind to localhost).
 
 ### 9.5 What Docker does not include in Stage 1
 
-- n8n container (may run on host).
 - Multi-replica app, K8s, reverse proxy, TLS termination.
+- Redis / workers / cloud deployment.
 
 ---
 
@@ -601,8 +607,9 @@ Manual Trigger
 
 - **Method:** `POST`
 - **URL:** `http://<host>:8000/api/v1/articles/generate`  
+  - If n8n runs in this Compose project: `http://app:8000/...` (default in the exported workflow)  
   - If n8n runs on the host and API in Docker: `http://localhost:8000/...`  
-  - If n8n later runs in Compose: `http://app:8000/...`
+  - If n8n runs in a separate Docker container: `http://host.docker.internal:8000/...` (Windows/macOS)
 - **Headers:** `Content-Type: application/json`
 - **Body:** JSON matching §6.2
 - **Auth:** none in Stage 1
@@ -728,7 +735,7 @@ Failure branch: update `failed` + safe `error_message` → sanitized HTTP error 
 3. **Async SQLAlchemy + asyncpg** is used end-to-end (decided during implementation; see §5.3).
 4. **Health check** returns 503 when DB is down (extension of PROJECT.md happy-path example).
 5. **Failed generation** persists a row and returns an error response that may include `id` and `status=failed`.
-6. **n8n** may run on the host against published port `8000`; packaging n8n in Compose is optional and deferred.
+6. **n8n** runs as a Compose service (`localhost:5678`); the exported workflow calls `http://app:8000/...` on the internal network.
 7. **`word_count`** is whitespace-based on markdown source for MVP; exact algorithm documented in code/tests later.
 8. **Stage 7 “n8n automation”** means advanced workflows, not first introduction of n8n.
 9. **OpenAI structured output** may be achieved via JSON mode / schema or prompt-enforced JSON; implementation chooses the simplest reliable approach behind `OpenAIWriter`.

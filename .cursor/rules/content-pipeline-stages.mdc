@@ -1,0 +1,36 @@
+---
+description: Full content pipeline mapped to Stage 1 vs later stages
+alwaysApply: true
+---
+
+# Content pipeline — stage mapping
+
+See `PROJECT.md` §2 for the full table.
+
+## Stage 1 (current) — do this
+
+- **4** Image/infographic **placeholders** only (no real image APIs)
+- **5** `title`, `meta_description`, `url_slug` — prompt rules + persisted fields
+- **10** Callouts: Совет / Важно / Подсказка / Лайфхак / Рекомендация (prompt; only where natural)
+- Basic generation from brief / `outline` (manual outline in `topics.json` is OK)
+
+## After competitor analysis (Stage 3) — not now
+
+- **1** TOP competitor articles
+- **2** Competitor structure → improved outline
+- **3** Generate article **from that** competitor-based structure
+
+## Later
+
+| # | Feature | Stage |
+| --- | --- | --- |
+| 6 | Dzen shorter unique article | 1.1 / 9 |
+| 7 | Internal linking | 6 |
+| 4 real images | Image generation/search | 6 |
+| 8 | Detectors + optional Humanizer API | 9 |
+| 9 | Optimization + summary | 9 |
+
+## Do not
+
+- Pull SERP/competitors, Humanizer SaaS, detectors, or CMS into Stage 1 without an explicit assignment.
+- Replace Markdown storage with HTML-only or image-only flows.

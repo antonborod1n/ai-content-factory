@@ -1,0 +1,40 @@
+---
+description: Later move MD→HTML export from the backend into an n8n post-step
+alwaysApply: true
+---
+
+# Future: HTML export via n8n
+
+## Current Stage 1 behaviour (do not remove yet)
+
+- Source of truth for article body is **Markdown** (`content_markdown` in PostgreSQL).
+- On `status=completed`, the backend also writes a **per-article folder**:
+  - `output/articles/{id}_{slug}/article.md`
+  - `output/articles/{id}_{slug}/article.html` (Markdown → HTML via `app/core/markdown_html.py`)
+- Conversion is deterministic library code — **not** an AI call.
+
+## Planned change (explicit future task)
+
+When implementing richer n8n automation (Stage 7 / dedicated assignment):
+
+1. Keep generating and storing **Markdown** in the backend (do not ask the model for HTML).
+2. Move **HTML rendering / packaging / delivery** into the n8n workflow **after** a successful `POST /api/v1/articles/generate`.
+3. Suggested n8n shape:
+
+```text
+Manual Trigger / topics file
+  → HTTP Generate Article
+  → IF Success
+  → Convert Markdown to HTML (Code node or dedicated backend endpoint)
+  → Write/upload HTML (disk, CMS, email, S3, …)
+```
+
+4. Prefer a thin backend helper endpoint (e.g. `POST /api/v1/articles/{id}/render-html`) **or** n8n Code node calling the same conversion rules — do not duplicate divergent HTML logic in two places long-term.
+5. After n8n owns delivery, the in-process `.html` file write in `ArticleService` may become optional (`ARTICLES_OUTPUT_DIR` / a dedicated flag) — only remove it behind an explicit task and tests.
+6. n8n must still contain **no** article-generation business logic and **no** provider secrets.
+
+## Do not
+
+- Replace Markdown storage with HTML-only storage.
+- Put OpenAI / prompts inside the HTML conversion step.
+- Implement the n8n HTML pipeline until there is an explicit assignment for it.

@@ -26,7 +26,8 @@ Set your own `POSTGRES_PASSWORD`, keep `DATABASE_URL` in sync with it, and add
 `OPENAI_API_KEY`. Compose refuses to start if `POSTGRES_PASSWORD` or
 `DATABASE_URL` is missing — no credentials are hardcoded anywhere.
 
-2. Start services (the app container applies Alembic migrations on start):
+2. Start services (the app container applies Alembic migrations on start;
+   Compose also starts **n8n** on port `5678`):
 
 ```bash
 docker compose up --build -d
@@ -43,6 +44,8 @@ Expected:
 ```json
 {"status":"ok","database":"ok"}
 ```
+
+n8n UI: <http://localhost:5678> (create a local owner account on first visit).
 
 ## Local development
 
@@ -101,6 +104,19 @@ is stored with status `failed`:
 
 Interactive docs: <http://localhost:8000/docs>
 
+## Topics from a file
+
+Edit [`topics/topics.json`](topics/topics.json) using the full brief format
+(`topic`, `word_count`, `primary_keywords`, `outline`, …). Start the API, then:
+
+```bash
+make generate-topics
+```
+
+Each object is sent as `POST /api/v1/articles/generate`. The user prompt in
+`prompts/article_writer.md` substitutes every brief field (including the whole
+plan as `{{brief_json}}`). Example: `topics/topics.example.json`.
+
 ## AI provider
 
 `OpenAIWriter` reads `OPENAI_API_KEY` and `OPENAI_MODEL` from the environment.
@@ -118,32 +134,14 @@ docker compose run --rm -e PYTHONPATH=/app -v ${PWD}/scripts:/app/scripts \
 
 ## n8n workflow
 
-`n8n/workflows/stage1_generate_article.json` is an importable workflow:
+n8n is a Compose service and a thin HTTP client: topic →
+`POST /api/v1/articles/generate` → show result. Generation and secrets stay
+in the backend. Default workflow URL uses the Compose hostname `app`.
 
-```text
-Manual Trigger -> Set Article Parameters -> Generate Article (HTTP) -> IF Success -> Result / Error Result
-```
+Workflow export: [`n8n/workflows/stage1_generate_article.json`](n8n/workflows/stage1_generate_article.json).
 
-It only supplies `topic`, `language`, `audience`, `keywords` and displays the
-response; all generation logic and the provider key stay in the backend.
-
-Import it via **Workflows -> Import from File** in the n8n UI. If you do not
-have n8n installed, run it next to the API:
-
-```bash
-docker run -d --name n8n -p 5678:5678 -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n
-```
-
-Then open <http://localhost:5678>, import the file, edit the topic in
-**Set Article Parameters** and press **Execute Workflow**.
-
-Adjust the URL in **Generate Article** to match where n8n runs:
-
-| n8n runs | URL |
-| --- | --- |
-| On the host | `http://localhost:8000/api/v1/articles/generate` |
-| In Docker (Windows/macOS) | `http://host.docker.internal:8000/api/v1/articles/generate` |
-| In this Compose project | `http://app:8000/api/v1/articles/generate` |
+Full Russian step-by-step (import, parameters, troubleshooting):
+**[`n8n/README.md`](n8n/README.md)**.
 
 ## Project layout
 
@@ -151,13 +149,15 @@ Adjust the URL in **Generate Article** to match where n8n runs:
 app/           FastAPI application (layered architecture)
 tests/         Unit, API, and integration tests
 prompts/       AI prompt templates
-scripts/       Manual smoke checks (not part of the test suite)
+topics/        Topic lists for batch generation
+scripts/       Manual smoke / batch clients (not part of the test suite)
 n8n/workflows/ Exported workflow JSON (no secrets)
 alembic/       Database migrations
 ```
 
 ## Documentation
 
+- `GUIDE.md` — how to work with the project: files map, prompts, article flow
 - `PROJECT.md` — product scope and Stage 1 requirements
 - `ARCHITECTURE.md` — Stage 1 architecture blueprint
 
@@ -166,7 +166,7 @@ alembic/       Database migrations
 Implemented:
 
 - Project skeleton
-- Docker Compose (`app` + `postgres`), migrations applied on container start
+- Docker Compose (`app` + `postgres` + `n8n`), migrations applied on container start
 - `GET /health` with database connectivity check
 - `articles` table, Alembic migration, `ArticleRepository`
 - AI layer: `AIWriter` protocol, `OpenAIWriter`, `MockAIWriter`, prompt loading
