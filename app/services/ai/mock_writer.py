@@ -64,4 +64,5 @@ class MockAIWriter:
             meta_description=f"Mock meta description for {request.topic}",
             content_markdown=content_markdown,
             word_count=word_count,
+            url_slug="mock-article",
         )
