@@ -19,10 +19,16 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str | None = None
     openai_temperature: float = 0.4
-    # ~1800 words of Russian markdown needs well over 4000 completion tokens.
-    openai_max_tokens: int | None = 8000
-    article_target_word_count: int = 1800
+    # ~3000 words of Russian markdown needs a large completion budget.
+    openai_max_tokens: int | None = 16000
+    article_target_word_count: int = 3000
+    # Small models undershoot the target, so a short draft is sent back for
+    # expansion until it reaches ratio * target (0 disables the extra calls).
+    article_min_word_ratio: float = 0.8
+    article_expand_attempts: int = 2
     prompts_dir: str | None = None
+    # Completed articles are also written here as Markdown. Empty = disabled.
+    articles_output_dir: str = "output/articles"
 
 
 @lru_cache

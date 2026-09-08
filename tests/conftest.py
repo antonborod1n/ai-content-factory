@@ -26,6 +26,9 @@ if "DATABASE_URL" not in os.environ and os.environ.get("POSTGRES_PASSWORD"):
 if "DATABASE_URL" in os.environ:
     os.environ["DATABASE_URL"] = derive_test_database_url(os.environ["DATABASE_URL"])
 
+# Do not litter the workspace with Markdown files from API/service tests.
+os.environ["ARTICLES_OUTPUT_DIR"] = ""
+
 from app.config import get_settings
 from app.db.session import (
     dispose_engine,

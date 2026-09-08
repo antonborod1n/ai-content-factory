@@ -53,6 +53,7 @@ async def test_generate_returns_completed_article(
         "status",
         "title",
         "meta_description",
+        "url_slug",
         "content_markdown",
         "word_count",
     }

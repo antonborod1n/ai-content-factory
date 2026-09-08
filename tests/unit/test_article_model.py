@@ -31,6 +31,7 @@ def test_article_columns() -> None:
         "keywords",
         "title",
         "meta_description",
+        "url_slug",
         "content_markdown",
         "word_count",
         "status",
@@ -45,6 +46,8 @@ def test_article_columns() -> None:
     assert isinstance(columns["word_count"].type, Integer)
     assert columns["title"].nullable is True
     assert columns["meta_description"].nullable is True
+    assert columns["url_slug"].nullable is True
+    assert columns["url_slug"].type.length == 120
     assert columns["content_markdown"].nullable is True
     assert columns["word_count"].nullable is True
     assert columns["error_message"].nullable is True
@@ -63,6 +66,7 @@ def test_article_instance_fields() -> None:
         status=ArticleStatus.PROCESSING,
         title=None,
         meta_description=None,
+        url_slug=None,
         content_markdown=None,
         word_count=None,
         error_message=None,
@@ -75,6 +79,7 @@ def test_article_instance_fields() -> None:
     assert article.status is ArticleStatus.PROCESSING
     assert article.title is None
     assert article.meta_description is None
+    assert article.url_slug is None
     assert article.content_markdown is None
     assert article.word_count is None
     assert article.error_message is None

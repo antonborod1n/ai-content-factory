@@ -1,6 +1,7 @@
 """Unit tests for ArticleService using in-memory doubles."""
 
 import uuid
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -46,6 +47,15 @@ class FakeArticleRepository:
         return article
 
 
+def _service(
+    repository: FakeArticleRepository,
+    writer: object,
+    *,
+    output_dir: str = "",
+) -> ArticleService:
+    return ArticleService(repository, writer, output_dir=output_dir)
+
+
 LEAKY_SECRET = "fake-password-must-not-leak"
 
 
@@ -73,7 +83,7 @@ def _request(**overrides: Any) -> ArticleWriteInput:
 async def test_generate_completes_and_persists_content() -> None:
     repository = FakeArticleRepository()
     writer = MockAIWriter()
-    service = ArticleService(repository, writer)
+    service = _service(repository, writer)
 
     article = await service.generate(_request())
 
@@ -86,9 +96,31 @@ async def test_generate_completes_and_persists_content() -> None:
 
 
 @pytest.mark.asyncio
+async def test_generate_writes_markdown_file(tmp_path: Path) -> None:
+    repository = FakeArticleRepository()
+    service = _service(repository, MockAIWriter(), output_dir=tmp_path)
+
+    article = await service.generate(_request())
+
+    article_dirs = [p for p in tmp_path.iterdir() if p.is_dir()]
+    assert len(article_dirs) == 1
+    assert str(article.id) in article_dirs[0].name
+    files = list(article_dirs[0].glob("*.md"))
+    html_files = list(article_dirs[0].glob("*.html"))
+    assert len(files) == 1
+    assert len(html_files) == 1
+    text = files[0].read_text(encoding="utf-8")
+    assert article.title in text
+    assert article.content_markdown in text
+    html_text = html_files[0].read_text(encoding="utf-8")
+    assert "<!DOCTYPE html>" in html_text
+    assert article.title in html_text
+
+
+@pytest.mark.asyncio
 async def test_generate_follows_status_transitions() -> None:
     repository = FakeArticleRepository()
-    service = ArticleService(repository, MockAIWriter())
+    service = _service(repository, MockAIWriter())
 
     await service.generate(_request())
 
@@ -103,7 +135,7 @@ async def test_generate_follows_status_transitions() -> None:
 async def test_generate_stores_request_parameters() -> None:
     repository = FakeArticleRepository()
     writer = MockAIWriter()
-    service = ArticleService(repository, writer)
+    service = _service(repository, writer)
 
     request = _request(language="en", audience="Buyers", keywords=["pump", "guide"])
     article = await service.generate(request)
@@ -127,7 +159,7 @@ async def test_generate_recalculates_word_count_and_ignores_ai_value() -> None:
             word_count=9999,
         )
     )
-    service = ArticleService(repository, writer)
+    service = _service(repository, writer)
 
     article = await service.generate(_request())
 
@@ -138,7 +170,7 @@ async def test_generate_recalculates_word_count_and_ignores_ai_value() -> None:
 @pytest.mark.asyncio
 async def test_generate_marks_failed_on_ai_provider_error() -> None:
     repository = FakeArticleRepository()
-    service = ArticleService(repository, MockAIWriter(fail_with=AIProviderError()))
+    service = _service(repository, MockAIWriter(fail_with=AIProviderError()))
 
     with pytest.raises(ArticleGenerationUpstreamError) as exc_info:
         await service.generate(_request())
@@ -163,7 +195,7 @@ async def test_generate_marks_failed_on_ai_provider_error() -> None:
 async def test_generate_marks_failed_on_invalid_ai_output() -> None:
     repository = FakeArticleRepository()
     writer = MockAIWriter(invalid_payload={"title": "Only title"})
-    service = ArticleService(repository, writer)
+    service = _service(repository, writer)
 
     with pytest.raises(ArticleGenerationUpstreamError) as exc_info:
         await service.generate(_request())
@@ -179,7 +211,7 @@ async def test_generate_marks_failed_on_invalid_ai_output() -> None:
 async def test_generate_treats_misconfiguration_as_internal_error() -> None:
     repository = FakeArticleRepository()
     writer = MockAIWriter(fail_with=AIConfigurationError())
-    service = ArticleService(repository, writer)
+    service = _service(repository, writer)
 
     with pytest.raises(ArticleGenerationError) as exc_info:
         await service.generate(_request())
@@ -195,7 +227,7 @@ async def test_generate_treats_misconfiguration_as_internal_error() -> None:
 @pytest.mark.asyncio
 async def test_generate_wraps_unexpected_error_with_safe_message() -> None:
     repository = FakeArticleRepository()
-    service = ArticleService(repository, ExplodingWriter())
+    service = _service(repository, ExplodingWriter())
 
     with pytest.raises(ArticleGenerationError) as exc_info:
         await service.generate(_request())

@@ -53,6 +53,7 @@ class Article(Base):
     )
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     meta_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    url_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
     content_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[ArticleStatus] = mapped_column(

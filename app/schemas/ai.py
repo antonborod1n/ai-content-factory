@@ -1,17 +1,99 @@
 """AI-related Pydantic schemas."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ArticleWriteInput(BaseModel):
-    """Input contract for AIWriter.generate."""
+    """Input contract for AIWriter.generate (brief + legacy fields)."""
 
     model_config = ConfigDict(extra="forbid")
 
     topic: str = Field(min_length=1)
     language: str = "ru"
     audience: str = "general"
+    # Legacy flat list; kept in sync with primary_keywords when possible.
     keywords: list[str] = Field(default_factory=list)
+
+    # Target length for the prompt (backend still recalculates the stored count).
+    word_count: int | None = Field(default=None, ge=1)
+    search_intent: str = "informational_commercial"
+    primary_keywords: list[str] = Field(default_factory=list)
+    secondary_keywords: list[str] = Field(default_factory=list)
+    article_goal: str = ""
+    tone: str = "экспертный, понятный, разговорный"
+    include_tables: bool = True
+    include_lists: bool = True
+    include_faq: bool = True
+    faq_count: int = Field(default=5, ge=0)
+    image_placeholders: int = Field(default=3, ge=0)
+    infographic_placeholders: int = Field(default=1, ge=0)
+    cta: str = ""
+    outline: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _sync_keyword_fields(self) -> ArticleWriteInput:
+        if not self.primary_keywords and self.keywords:
+            self.primary_keywords = list(self.keywords)
+        if not self.keywords and self.primary_keywords:
+            self.keywords = list(self.primary_keywords)
+        return self
+
+    def keywords_for_storage(self) -> list[str]:
+        """Primary + secondary keywords for the articles.keywords column."""
+        seen: set[str] = set()
+        merged: list[str] = []
+        for keyword in (
+            *self.primary_keywords,
+            *self.secondary_keywords,
+            *self.keywords,
+        ):
+            cleaned = keyword.strip()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                merged.append(cleaned)
+        return merged
+
+    def brief_for_prompt(self, *, default_word_count: int) -> dict:
+        """JSON plan block embedded into the user prompt."""
+        return {
+            "topic": self.topic,
+            "language": self.language,
+            "audience": self.audience,
+            "word_count": self.word_count or default_word_count,
+            "search_intent": self.search_intent,
+            "primary_keywords": self.primary_keywords,
+            "secondary_keywords": self.secondary_keywords,
+            "article_goal": self.article_goal,
+            "tone": self.tone,
+            "include_tables": self.include_tables,
+            "include_lists": self.include_lists,
+            "include_faq": self.include_faq,
+            "faq_count": self.faq_count,
+            "image_placeholders": self.image_placeholders,
+            "infographic_placeholders": self.infographic_placeholders,
+            "cta": self.cta,
+            "outline": self.outline,
+        }
+
+
+class AIArticleMetaOutput(BaseModel):
+    """SEO wrapper returned before the body is written section by section."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1)
+    meta_description: str = Field(min_length=1)
+    url_slug: str = Field(default="")
+
+
+class AISectionOutput(BaseModel):
+    """Markdown of a single article section."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    content_markdown: str = Field(min_length=1)
 
 
 class AIArticleOutput(BaseModel):
@@ -23,3 +105,7 @@ class AIArticleOutput(BaseModel):
     meta_description: str = Field(min_length=1)
     content_markdown: str = Field(min_length=1)
     word_count: int = Field(ge=0)
+    url_slug: str = Field(
+        default="",
+        description="SEO URL slug: lowercase latin, digits, hyphens",
+    )

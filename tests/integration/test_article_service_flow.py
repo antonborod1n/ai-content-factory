@@ -27,7 +27,7 @@ async def test_completed_article_is_stored_in_postgres(
     article_repository: ArticleRepository,
     db_session: AsyncSession,
 ) -> None:
-    service = ArticleService(article_repository, MockAIWriter())
+    service = ArticleService(article_repository, MockAIWriter(), output_dir="")
 
     article = await service.generate(_request())
 
@@ -56,7 +56,7 @@ async def test_failed_article_is_stored_with_safe_message(
     db_session: AsyncSession,
 ) -> None:
     writer = MockAIWriter(fail_with=AIProviderError())
-    service = ArticleService(article_repository, writer)
+    service = ArticleService(article_repository, writer, output_dir="")
 
     with pytest.raises(ArticleGenerationUpstreamError):
         await service.generate(_request())
@@ -81,7 +81,7 @@ async def test_failed_article_is_stored_with_safe_message(
 async def test_repository_can_read_back_generated_article(
     article_repository: ArticleRepository,
 ) -> None:
-    service = ArticleService(article_repository, MockAIWriter())
+    service = ArticleService(article_repository, MockAIWriter(), output_dir="")
 
     article = await service.generate(_request())
     found = await article_repository.get_by_id(article.id)

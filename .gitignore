@@ -36,3 +36,7 @@ htmlcov/
 
 # Docker volumes (local overrides)
 postgres_data/
+
+# Generated article folders (keep the root, ignore contents)
+output/articles/**
+!output/articles/.gitkeep

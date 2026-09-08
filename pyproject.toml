@@ -13,6 +13,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "alembic>=1.14.0",
     "openai>=1.59.0",
+    "markdown>=3.7",
 ]
 
 [project.optional-dependencies]
