@@ -58,7 +58,7 @@
       "position": [220, 0],
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:8000/api/v1/articles/generate",
+        "url": "http://app:8000/api/v1/articles/generate",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ topic: $json.topic, language: $json.language, audience: $json.audience, keywords: $json.keywords }) }}",

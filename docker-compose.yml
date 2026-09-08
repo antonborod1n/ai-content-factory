@@ -6,7 +6,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-acf}
     ports:
-      - "5432:5432"
+      # Local tools only; never expose the database beyond this machine.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,18 +19,22 @@ services:
   app:
     build: .
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
       PROMPTS_DIR: /app/prompts
+      ARTICLES_OUTPUT_DIR: /app/output/articles
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests
       - ./alembic:/app/alembic
       - ./prompts:/app/prompts
       - ./n8n:/app/n8n
+      - ./topics:/app/topics
+      - ./scripts:/app/scripts
+      - ./output:/app/output
       - ./pyproject.toml:/app/pyproject.toml
     depends_on:
       postgres:
@@ -41,5 +46,24 @@ services:
       retries: 10
       start_period: 10s
 
+  # Thin HTTP client for Stage 1 — no OpenAI keys, no DB credentials.
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    ports:
+      # n8n has no auth in Stage 1 — keep the UI on the loopback interface.
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Europe/Moscow}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  n8n_data:

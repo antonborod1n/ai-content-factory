@@ -56,13 +56,15 @@ def test_workflow_has_the_stage1_node_chain(
     assert targets("IF Success", 1) == ["Error Result"]
 
 
-def test_workflow_sends_exactly_the_request_fields(nodes_by_name: dict) -> None:
+def test_workflow_sends_core_request_fields(nodes_by_name: dict) -> None:
     assignments = nodes_by_name["Set Article Parameters"]["parameters"][
         "assignments"
     ]["assignments"]
     sent_fields = {assignment["name"] for assignment in assignments}
 
-    assert sent_fields == set(ArticleGenerateRequest.model_fields)
+    # Stage 1 n8n workflow stays minimal; the full brief comes from topics.json.
+    assert sent_fields == {"topic", "language", "audience", "keywords"}
+    assert sent_fields.issubset(ArticleGenerateRequest.model_fields)
 
     body_expression = nodes_by_name["Generate Article"]["parameters"]["jsonBody"]
     for field in sent_fields:
@@ -73,10 +75,12 @@ def test_workflow_posts_to_an_existing_route(nodes_by_name: dict) -> None:
     parameters = nodes_by_name["Generate Article"]["parameters"]
     assert parameters["method"] == "POST"
 
-    path = urlparse(parameters["url"]).path
+    parsed = urlparse(parameters["url"])
+    # Default export targets the Compose service hostname.
+    assert parsed.hostname == "app"
     paths = create_app().openapi()["paths"]
-    assert path in paths
-    assert "post" in paths[path]
+    assert parsed.path in paths
+    assert "post" in paths[parsed.path]
 
 
 def test_workflow_branches_on_the_http_status_code(nodes_by_name: dict) -> None:
