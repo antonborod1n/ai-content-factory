@@ -1,18 +1,19 @@
-.PHONY: help install install-dev up down logs build test lint format shell migrate
+.PHONY: help install install-dev up down logs build test lint format shell migrate generate-topics
 
 help:
 	@echo "Targets:"
-	@echo "  install      Install runtime dependencies"
-	@echo "  install-dev  Install runtime + dev dependencies"
-	@echo "  up           Start Docker Compose (app + postgres)"
-	@echo "  down         Stop Docker Compose"
-	@echo "  logs         Tail Compose logs"
-	@echo "  build        Rebuild Compose images"
-	@echo "  migrate      Run Alembic migrations"
-	@echo "  test         Run pytest"
-	@echo "  lint         Run Ruff check"
-	@echo "  format       Run Ruff format"
-	@echo "  shell        Open a shell in the app container"
+	@echo "  install          Install runtime dependencies"
+	@echo "  install-dev      Install runtime + dev dependencies"
+	@echo "  up               Start Docker Compose (app + postgres + n8n)"
+	@echo "  down             Stop Docker Compose"
+	@echo "  logs             Tail Compose logs"
+	@echo "  build            Rebuild Compose images"
+	@echo "  migrate          Run Alembic migrations"
+	@echo "  test             Run pytest"
+	@echo "  lint             Run Ruff check"
+	@echo "  format           Run Ruff format"
+	@echo "  shell            Open a shell in the app container"
+	@echo "  generate-topics  Generate articles from topics/topics.json"
 
 install:
 	pip install -e .
@@ -47,3 +48,14 @@ format:
 
 shell:
 	docker compose exec app bash
+
+# Reads topics/topics.json and POSTs each topic to the running API.
+# Override file: make generate-topics TOPICS=topics/my_list.txt
+TOPICS ?= topics/topics.json
+generate-topics:
+	docker compose run --rm \
+		-e PYTHONPATH=/app \
+		-e API_BASE_URL=http://app:8000 \
+		-v "$(CURDIR)/scripts:/app/scripts" \
+		-v "$(CURDIR)/topics:/app/topics" \
+		--entrypoint python app scripts/generate_from_topics.py $(TOPICS)
