@@ -40,3 +40,20 @@ postgres_data/
 # Generated article folders (keep the root, ignore contents)
 output/articles/**
 !output/articles/.gitkeep
+
+# Task-run journal (regenerated at runtime)
+logs/*.jsonl
+
+# Working topic queues and client content plans stay local; only examples are shared
+topics/*
+!topics/topics.example.json
+!topics/topics.example.txt
+
+# Client knowledge-base documents stay local
+knowledge/*
+!knowledge/README.md
+
+# Operator UI
+web/node_modules/
+web/dist/
+
