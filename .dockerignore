@@ -27,3 +27,5 @@ ARCHITECTURE.md
 
 # Local data
 postgres_data
+web/node_modules
+web/dist

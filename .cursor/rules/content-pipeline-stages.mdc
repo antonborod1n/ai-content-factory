@@ -7,30 +7,96 @@ alwaysApply: true
 
 See `PROJECT.md` §2 for the full table.
 
-## Stage 1 (current) — do this
+## Stage 6 (current) — Dzen + quality
 
-- **4** Image/infographic **placeholders** only (no real image APIs)
-- **5** `title`, `meta_description`, `url_slug` — prompt rules + persisted fields
+After images/links: optional detectors (scores only), optional Humanizer
+rewrite, optional summary, then a shorter Dzen version of the **same**
+article from its title (`use_dzen`). Three Dzen image slots: cover + two
+in the body.
+
+Do not pull CMS, GPTZero/Copyscape HTTP, or third-party Humanizer SaaS
+into this work.
+
+## Stage 5 — Images + internal linking
+
+After writer / multi-agent editor: replace image placeholders via `ImageProvider`.
+Hero `COVER_PLACEHOLDER` → `images/cover.png` is generated from the **title**.
+In-body photos use the **section heading + excerpt**.
+Then insert markdown links to other completed articles (no extra LLM).
+When competitor research is on, photo counts per outline block come from
+the average of competitor `section_images`.
+
+## Stage 4 — Multi-agent
+
+Research → SEO → Writer → Fact Checker → Editor (`use_multi_agent`).
+
+## Topic Discovery (sibling of Stage 3)
+
+Seeds → Google + Yandex SERP snapshots (official APIs, not HTML scrape) →
+dedupe → TopicPlanner briefs → `topics.json` → existing generate.
+
+Does not replace Stage 3 research (that still analyzes an already chosen topic).
+
+## Competitor topic files (first substep of competitor analysis)
+
+xlsx/csv/txt dumps → `app/core/competitor_sources.py` → `ContentGapAnalyst` →
+`content-plan` rows → `app/core/competitor_plan.py` → `topics/*.json`.
+Ready `content-plan-*.json` skips the analyst. Discovery stays a sibling
+(search seeds). Stage 3 research is the second substep (outline for a chosen
+topic). Do not ingest the topic table into RAG; project context lives in a
+local `knowledge/<project>-brief.md` (not committed).
+
+## Stage 3 — Research / SEO / competitors
+
+Topic → SERP TOP articles → structure parse → improved outline → generate.
+
+## Stage 2 — Knowledge Base / RAG
+
+Documents → parser → chunking → embeddings → pgvector → optional context on generate.
+
+## Stage 1 — keep this
+
+- **4** Image/infographic **placeholders** in writer prompts (Stage 5 replaces them when `use_images`)
+- **5** `title`, `meta_description`, `url_slug` — prompt rules + persisted fields (Stage 3 strengthens them from SERP)
 - **10** Callouts: Совет / Важно / Подсказка / Лайфхак / Рекомендация (prompt; only where natural)
-- Basic generation from brief / `outline` (manual outline in `topics.json` is OK)
+- Basic generation from brief / `outline` (manual outline in `topics.json` is OK when research is off)
 
-## After competitor analysis (Stage 3) — not now
+## Stage 3 — in scope
 
 - **1** TOP competitor articles
 - **2** Competitor structure → improved outline
 - **3** Generate article **from that** competitor-based structure
 
+## Stage 5 — in scope
+
+- **4** real images for `IMAGE_PLACEHOLDER_N` / `INFOGRAPHIC_PLACEHOLDER_N`
+- **7** Internal linking between completed articles
+
+## Stage 6 — in scope
+
+- **6** Dzen: shorter same-article version, 3 images (cover + two in body)
+- **8** Detectors + optional Humanizer (own chat; not Copyscape / GPTZero / SaaS)
+- **9** Summary from the final markdown (before CMS)
+
 ## Later
 
-| # | Feature | Stage |
-| --- | --- | --- |
-| 6 | Dzen shorter unique article | 1.1 / 9 |
-| 7 | Internal linking | 6 |
-| 4 real images | Image generation/search | 6 |
-| 8 | Detectors + optional Humanizer API | 9 |
-| 9 | Optimization + summary | 9 |
+CMS / review / publish is **Stage 8**, after images, links and quality checks.
+Analytics is **Stage 9** (after publication). n8n HTML packaging is **Stage 7**.
+
+Deferred (do not implement without an explicit task):
+
+- **Operator UI (Stage 8a)** — F0–F5 done, including `review_status`.
+  CMS publish stays Stage 8. Plan:
+  `PROJECT.md` §15 «План: операторский UI» and `GUIDE.md` §5.7 / §11.Д.
+- **Multiple projects** — done (P0–P5). KB, topics, articles, research, and
+ internal links stay inside one `project_id`. Do not mix RAG or internal
+ links across projects. Auth/billing stay out.
+
+Topic source switch is implemented: `scripts/build_topics.py --mode discovery|competitor`
+(Makefile `topics-discovery` / `topics-competitors`). Not a generate flag, not
+a unified FastAPI orchestrator, not n8n.
 
 ## Do not
 
-- Pull SERP/competitors, Humanizer SaaS, detectors, or CMS into Stage 1 without an explicit assignment.
+- Pull Humanizer SaaS, GPTZero/Copyscape, or CMS into this work without an explicit assignment. CMS is Stage 8 (after images and quality).
 - Replace Markdown storage with HTML-only or image-only flows.

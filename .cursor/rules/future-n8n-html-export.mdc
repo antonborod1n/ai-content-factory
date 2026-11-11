@@ -9,8 +9,8 @@ alwaysApply: true
 
 - Source of truth for article body is **Markdown** (`content_markdown` in PostgreSQL).
 - On `status=completed`, the backend also writes a **per-article folder**:
-  - `output/articles/{id}_{slug}/article.md`
-  - `output/articles/{id}_{slug}/article.html` (Markdown → HTML via `app/core/markdown_html.py`)
+  - `output/articles/{DD-MM-YYYY}-{id}_{slug}/article.md`
+  - `output/articles/{DD-MM-YYYY}-{id}_{slug}/article.html` (Markdown → HTML via `app/core/markdown_html.py`)
 - Conversion is deterministic library code — **not** an AI call.
 
 ## Planned change (explicit future task)
@@ -26,8 +26,10 @@ Manual Trigger / topics file
   → HTTP Generate Article
   → IF Success
   → Convert Markdown to HTML (Code node or dedicated backend endpoint)
-  → Write/upload HTML (disk, CMS, email, S3, …)
+  → Write/upload HTML (disk, email, S3, …)
 ```
+
+CMS upload belongs to **Stage 8** (review → CMS → publish), after images and quality checks — do not wire a CMS in this n8n step until that stage.
 
 4. Prefer a thin backend helper endpoint (e.g. `POST /api/v1/articles/{id}/render-html`) **or** n8n Code node calling the same conversion rules — do not duplicate divergent HTML logic in two places long-term.
 5. After n8n owns delivery, the in-process `.html` file write in `ArticleService` may become optional (`ARTICLES_OUTPUT_DIR` / a dedicated flag) — only remove it behind an explicit task and tests.

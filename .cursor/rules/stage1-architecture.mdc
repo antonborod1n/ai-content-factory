@@ -1,35 +1,46 @@
 ---
-description: Stage 1 architecture and scope rules for AI Content Factory
+description: Stage 1–6 architecture and scope rules for AI Content Factory
 alwaysApply: true
 ---
 
-# AI Content Factory — Stage 1 Rules
+# AI Content Factory — Stage 1–6 Rules
 
 Follow `PROJECT.md` and `ARCHITECTURE.md`.
 
 ## Layering
 
-- API routes: HTTP, validation, response mapping, DI only — no business logic, no OpenAI, no SQL.
-- Services: orchestration and domain rules only.
-- AI layer (`app/services/ai/`): only place that may call AI providers, via `AIWriter` abstraction.
-- Repositories: PostgreSQL only — no business logic, no AI calls.
+- API routes: HTTP, validation, response mapping, DI only — no business logic, no OpenAI, no SQL, no SERP HTTP, no image HTTP.
+- Services: orchestration and domain rules only (`ArticleService`, `DocumentService`, `RagService`, `ResearchService`, `DiscoveryService`, `CompetitorTopicsService`, `PipelineService`, `ImageService`, `LinkingService`, `DzenService`, `QualityService`).
+- AI layer (`app/services/ai/`): only place that may call chat/embedding/image providers, via `AIWriter`, `Embedder`, `CompetitorAnalyst`, `SeoAgent`, `FactChecker`, `Editor`, `ImageProvider`, `DzenWriter`, `AiDetector`, `Humanizer`, `Summarizer`, `TopicPlanner`, and `ContentGapAnalyst`.
+- Search/fetch (`app/services/research/`): SERP and page HTTP via `SearchProvider` / `PageFetcher`.
+- Discovery snapshots (`app/services/discovery/`): Google/Yandex SERP HTTP via `SerpSnapshotProvider` (not HTML scrape of google.com / yandex.ru).
+- Repositories: PostgreSQL / pgvector only — no business logic, no AI or SERP calls.
+- Parser, chunking, HTML structure, competitor article filter, competitor brief stats, placeholders, per-section image counts, internal-link insertion, detector verdict, topic-candidate dedupe, competitor-plan JSON mapping, competitor dump parse (`app/core/`): deterministic, no AI, no SQL.
 
-## Stage 1 scope
+## Current scope (Stage 1 + Stage 2 + Stage 3 + Stage 4 + Stage 5 + Stage 6)
 
-Implement only what the current assignment requests. Do **not** add without an explicit task:
+Stage 6 **does** include: a shorter Dzen version (`use_dzen`); heuristic
+detectors, optional Humanizer rewrite, and summary (`use_detectors` /
+`use_humanizer` / `use_summary`). These are own-chat heuristics, **not**
+Copyscape, GPTZero, or a third-party Humanizer SaaS.
 
-- RAG / pgvector / document processing
-- SEO, CMS, publishing, images, internal linking
-- Multi-agent systems
-- Frontend / dashboard / authentication / billing
+Do **not** add without an explicit task:
+
+- CMS / publishing
+- GPTZero / Copyscape / Undetectable.ai (or other detector/humanizer SaaS HTTP)
+- HTML scrape of google.com / yandex.ru (use SERP APIs only)
+- Extra dashboards / authentication / billing / CMS publish
+  (operator UI F0–F5 in `web/` already exists)
 - Redis / Kafka / workers / Kubernetes / cloud deployment
+- Agent frameworks (LangChain etc.) or extra fact-check loops
 
 ## Secrets
 
-Never put API keys, DB credentials, or secrets in source, prompts, n8n workflows, logs, README, or API responses. Use environment variables only.
+Never put API keys, DB credentials, or secrets in source, prompts, n8n workflows, logs, README, or API responses. Use environment variables only. Do not log document contents, embedding vectors, HTML bodies, SERP payloads, image bytes, image prompts, or full article drafts at INFO.
 
 ## Quality
 
 - New behavior must have tests.
 - Prefer simple, maintainable code over premature abstractions.
 - Prefer async SQLAlchemy + asyncpg as configured for this project.
+- Tests must not call a real embedding, chat, SERP, or image provider (`MockEmbedder` / `MockAIWriter` / `MockSearchProvider` / `MockPageFetcher` / `MockSerpSnapshotProvider` / `MockCompetitorAnalyst` / `MockSeoAgent` / `MockFactChecker` / `MockEditor` / `MockImageProvider` / `MockDzenWriter` / `MockAiDetector` / `MockHumanizer` / `MockSummarizer` / `MockTopicPlanner` / `MockContentGapAnalyst`).

@@ -1,15 +1,20 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector extension is required for Stage 2 embeddings.
+    # Recreate the volume when switching from postgres:16-alpine.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-acf}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-acf}
     ports:
       # Local tools only; never expose the database beyond this machine.
-      - "127.0.0.1:5432:5432"
+      # Host 15432: Windows often reserves 5432 (Hyper-V excluded ranges).
+      - "127.0.0.1:15432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # New volume: pgvector image is Debian-based and cannot reuse the Stage 1
+      # alpine data directory. The old `postgres_data` volume is left unused.
+      - postgres_pgvector_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-acf} -d ${POSTGRES_DB:-acf}"]
       interval: 5s
@@ -35,6 +40,7 @@ services:
       - ./topics:/app/topics
       - ./scripts:/app/scripts
       - ./output:/app/output
+      - ./logs:/app/logs
       - ./pyproject.toml:/app/pyproject.toml
     depends_on:
       postgres:
@@ -51,12 +57,13 @@ services:
     image: docker.n8n.io/n8nio/n8n
     ports:
       # n8n has no auth in Stage 1 — keep the UI on the loopback interface.
-      - "127.0.0.1:${N8N_PORT:-5678}:5678"
+      # Host 15678: Windows often reserves 5678 (Hyper-V excluded ranges).
+      - "127.0.0.1:${N8N_PORT:-15678}:5678"
     environment:
       N8N_HOST: ${N8N_HOST:-localhost}
       N8N_PORT: 5678
       N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
-      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:15678/}
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Europe/Moscow}
     volumes:
       - n8n_data:/home/node/.n8n
@@ -65,5 +72,5 @@ services:
         condition: service_healthy
 
 volumes:
-  postgres_data:
+  postgres_pgvector_data:
   n8n_data:

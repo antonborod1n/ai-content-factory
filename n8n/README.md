@@ -1,4 +1,4 @@
-# n8n в AI Content Factory (Stage 1)
+# n8n в AI Content Factory (Stage 1–2)
 
 Пошаговая инструкция: как поднять n8n вместе со стеком проекта и
 сгенерировать статью через готовый workflow.
@@ -60,7 +60,7 @@ curl.exe http://localhost:8000/health
 
 Ожидается: `{"status":"ok","database":"ok"}`.
 
-UI n8n: <http://localhost:5678> (или порт из `N8N_PORT`).
+UI n8n: <http://localhost:15678> (или порт из `N8N_PORT`).
 
 При первом входе создай локальный аккаунт владельца (email + пароль). Данные
 хранятся в томе Compose `n8n_data`.
@@ -71,8 +71,9 @@ UI n8n: <http://localhost:5678> (или порт из `N8N_PORT`).
 docker compose logs -f n8n
 ```
 
-Если порт `5678` занят — задай в `.env`, например `N8N_PORT=5679`, и
-пересоздай сервис: `docker compose up -d n8n`.
+Если порт `15678` занят — задай в `.env`, например `N8N_PORT=15679` и
+`N8N_WEBHOOK_URL=http://localhost:15679/`, и пересоздай сервис:
+`docker compose up -d n8n`. Внутри контейнера n8n всегда слушает 5678.
 
 ## 4. Импорт workflow
 
@@ -121,6 +122,10 @@ n8n/workflows/stage1_generate_article.json
 Полный brief из `topics/topics.json` в этом Stage 1 workflow **не обязателен**:
 бэкенд подставит дефолты.
 
+База знаний (Stage 2) в n8n отдельно не загружается. Документы кладут через
+API / Swagger ([GUIDE.md](../GUIDE.md) §5.1). Если в базе уже есть готовые
+документы, generate подмешает их сам (`use_knowledge_base` по умолчанию true).
+
 ## 7. Запуск
 
 Нажми **Execute Workflow**.
@@ -139,7 +144,7 @@ n8n/workflows/stage1_generate_article.json
 docker compose exec postgres psql -U acf -d acf -c "SELECT id, status, word_count, left(title, 50) FROM articles ORDER BY created_at DESC LIMIT 3;"
 ```
 
-3. **Файлы:** `output/articles/{uuid}_{slug}/article.md` и `article.html`.
+3. **Файлы:** `output/articles/{ДД-ММ-ГГГГ}-{uuid}_{slug}/article.md` и `article.html`.
 
 ## 9. Типичные ошибки
 
@@ -150,7 +155,7 @@ docker compose exec postgres psql -U acf -d acf -c "SELECT id, status, word_coun
 | HTTP **502** | Провайдер / JSON модели — `docker compose logs app` |
 | HTTP **500** | Внутренняя ошибка / нет ключа — логи `app` |
 | Долго висит / timeout | Timeout HTTP-узла ≥ 180000 мс |
-| Порт 5678 занят | `N8N_PORT` в `.env` |
+| Порт 15678 занят | `N8N_PORT` и `N8N_WEBHOOK_URL` в `.env` |
 
 ## 10. Чего нельзя делать в n8n
 
@@ -182,10 +187,13 @@ docker volume rm ai-content-factory_n8n_data
 
 Имя тома может отличаться (`docker volume ls | findstr n8n`).
 
-## 12. Что дальше (Stage 7)
+## 12. Что дальше (Stage 7–8)
 
-Сейчас n8n — ручной запуск одной генерации. Позже: расписание, цепочки,
-доставка HTML — см. [`.cursor/rules/future-n8n-html-export.mdc`](../.cursor/rules/future-n8n-html-export.mdc).
+Сейчас n8n — ручной запуск одной генерации. Позже:
+
+- **Stage 7** — расписание, цепочки, упаковка HTML
+  (см. [`.cursor/rules/future-n8n-html-export.mdc`](../.cursor/rules/future-n8n-html-export.mdc)).
+- **Stage 8** — ревью, CMS, публикация (когда статья уже с картинками и проверками).
 
 ## Связанные документы
 
