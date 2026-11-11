@@ -74,7 +74,6 @@ def reset_engine_state() -> None:
     _session_factory = None
 
 
-# Satisfy type checkers for re-exports if needed later
 __all__ = [
     "check_database_connection",
     "dispose_engine",

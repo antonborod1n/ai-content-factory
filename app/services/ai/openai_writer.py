@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 from pathlib import Path
 from typing import Any, TypeVar
 
 from openai import APIError, AsyncOpenAI, OpenAIError
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from app.config import Settings, get_settings
 from app.core.exceptions import (
@@ -25,10 +23,13 @@ from app.schemas.ai import (
     AISectionOutput,
     ArticleWriteInput,
 )
+from app.services.ai.openai_client import build_async_openai
+from app.services.ai.openai_json import parse_model_json
 from app.services.ai.prompt_loader import (
     load_system_prompt,
     render_article_expand_prompt,
     render_article_meta_prompt,
+    render_article_section_expand_prompt,
     render_article_section_prompt,
     render_article_writer_prompt,
     target_word_count,
@@ -38,11 +39,6 @@ from app.services.ai.section_plan import SectionPlan, build_section_plans
 logger = logging.getLogger(__name__)
 
 _PayloadT = TypeVar("_PayloadT", bound=BaseModel)
-
-_JSON_FENCE_RE = re.compile(
-    r"^```(?:json)?\s*(?P<body>.*?)\s*```$",
-    re.DOTALL | re.IGNORECASE,
-)
 
 
 class OpenAIWriter:
@@ -68,6 +64,7 @@ class OpenAIWriter:
         self._min_word_ratio = resolved.article_min_word_ratio
         self._expand_attempts = resolved.article_expand_attempts
         self._prompts_dir = prompts_dir
+        self._timeout = resolved.openai_timeout_seconds
         self._client = client
 
     @property
@@ -88,13 +85,11 @@ class OpenAIWriter:
             return self._client
         if not self.is_configured:
             raise AIConfigurationError("OpenAI API key is not configured")
-        if self._base_url:
-            self._client = AsyncOpenAI(
-                api_key=self._api_key,
-                base_url=self._base_url,
-            )
-        else:
-            self._client = AsyncOpenAI(api_key=self._api_key)
+        self._client = build_async_openai(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._timeout,
+        )
         return self._client
 
     async def generate(self, request: ArticleWriteInput) -> AIArticleOutput:
@@ -102,15 +97,26 @@ class OpenAIWriter:
         target = target_word_count(request, self._target_word_count)
         plans = build_section_plans(request, target_word_count=target)
         if plans:
+            logger.info(
+                "Writing %s sections for topic=%s target_words=%s",
+                len(plans),
+                request.topic,
+                target,
+            )
             return await self._generate_by_sections(request, system_prompt, plans)
+
+        logger.info(
+            "Writing article in one request topic=%s target_words=%s",
+            request.topic,
+            target,
+        )
 
         prompt = render_article_writer_prompt(
             request,
             default_word_count=self._target_word_count,
             prompts_dir=self._prompts_dir,
         )
-        raw_content = await self._complete(system_prompt, prompt)
-        article = self._parse_and_validate(raw_content)
+        article = await self._complete_json(system_prompt, prompt, AIArticleOutput)
         return await self._expand_to_target(request, system_prompt, article)
 
     async def _generate_by_sections(
@@ -120,14 +126,12 @@ class OpenAIWriter:
         plans: list[SectionPlan],
     ) -> AIArticleOutput:
         """Write the SEO wrapper, then one request per outline section."""
-        meta = self._parse(
-            await self._complete(
-                system_prompt,
-                render_article_meta_prompt(
-                    request,
-                    default_word_count=self._target_word_count,
-                    prompts_dir=self._prompts_dir,
-                ),
+        meta = await self._complete_json(
+            system_prompt,
+            render_article_meta_prompt(
+                request,
+                default_word_count=self._target_word_count,
+                prompts_dir=self._prompts_dir,
             ),
             AIArticleMetaOutput,
         )
@@ -135,31 +139,91 @@ class OpenAIWriter:
         parts = [f"# **{meta.title}**"]
         written: list[str] = []
         for plan in plans:
-            section = self._parse(
-                await self._complete(
-                    system_prompt,
-                    render_article_section_prompt(
-                        request,
-                        plan=plan,
-                        title=meta.title,
-                        previous_sections=written,
-                        default_word_count=self._target_word_count,
-                        prompts_dir=self._prompts_dir,
-                    ),
-                ),
-                AISectionOutput,
+            logger.info(
+                "Writing section %s/%s %s",
+                plan.index,
+                plan.total,
+                plan.title,
             )
-            parts.append(section.content_markdown.strip())
+            section_prompt = render_article_section_prompt(
+                request,
+                plan=plan,
+                title=meta.title,
+                previous_sections=written,
+                default_word_count=self._target_word_count,
+                prompts_dir=self._prompts_dir,
+            )
+            parts.append(
+                await self._write_section(system_prompt, section_prompt, plan)
+            )
             written.append(plan.title)
 
         content_markdown = "\n\n".join(parts)
+        words = count_words(content_markdown)
+        logger.info(
+            "Sectioned article assembled title=%s words=%s",
+            meta.title,
+            words,
+        )
         return AIArticleOutput(
             title=meta.title,
             meta_description=meta.meta_description,
             url_slug=meta.url_slug,
             content_markdown=content_markdown,
-            word_count=count_words(content_markdown),
+            word_count=words,
         )
+
+    async def _write_section(
+        self, system_prompt: str, section_prompt: str, plan: SectionPlan
+    ) -> str:
+        """Write one section and grow it while it is well below its share.
+
+        Each retry stays one section long, so it fits in a single response.
+        A failed or non-growing retry keeps the previous version.
+        """
+        section = (
+            await self._complete_json(system_prompt, section_prompt, AISectionOutput)
+        ).content_markdown.strip()
+        words = count_words(section)
+        minimum = int(plan.word_count * self._min_word_ratio)
+
+        for _ in range(self._expand_attempts):
+            if words >= minimum:
+                break
+            prompt = render_article_section_expand_prompt(
+                section_prompt,
+                plan=plan,
+                current_markdown=section,
+                current_word_count=words,
+                prompts_dir=self._prompts_dir,
+            )
+            try:
+                candidate = parse_model_json(
+                    await self._complete(system_prompt, prompt), AISectionOutput
+                ).content_markdown.strip()
+            except AIError:
+                logger.warning(
+                    "Section %s expansion failed; keeping %s words",
+                    plan.index,
+                    words,
+                )
+                break
+            candidate_words = count_words(candidate)
+            if candidate_words <= words:
+                logger.info(
+                    "Section %s expansion did not grow (%s words); stopping",
+                    plan.index,
+                    words,
+                )
+                break
+            logger.info(
+                "Expanded section %s from %s to %s words",
+                plan.index,
+                words,
+                candidate_words,
+            )
+            section, words = candidate, candidate_words
+        return section
 
     async def _expand_to_target(
         self,
@@ -198,7 +262,16 @@ class OpenAIWriter:
 
             candidate_words = count_words(candidate.content_markdown)
             if candidate_words <= words:
+                logger.info(
+                    "Expansion did not grow the draft (%s words); stopping",
+                    words,
+                )
                 break
+            logger.info(
+                "Expanded draft from %s to %s words",
+                words,
+                candidate_words,
+            )
             article, words = candidate, candidate_words
 
         if words < minimum:
@@ -248,31 +321,14 @@ class OpenAIWriter:
         return str(content)
 
     def _parse_and_validate(self, raw_content: str) -> AIArticleOutput:
-        return self._parse(raw_content, AIArticleOutput)
+        return parse_model_json(raw_content, AIArticleOutput)
 
-    def _parse(
-        self, raw_content: str, model: type[_PayloadT]
+    async def _complete_json(
+        self, system_prompt: str, prompt: str, model: type[_PayloadT]
     ) -> _PayloadT:
-        payload = self._extract_json_object(raw_content)
+        """Complete and validate, asking once more if the reply is not valid JSON."""
         try:
-            return model.model_validate(payload)
-        except ValidationError as exc:
-            raise AIValidationError(
-                "AI response failed validation"
-            ) from exc
-
-    @staticmethod
-    def _extract_json_object(raw_content: str) -> dict[str, Any]:
-        text = raw_content.strip()
-        fence_match = _JSON_FENCE_RE.match(text)
-        if fence_match is not None:
-            text = fence_match.group("body").strip()
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise AIValidationError(
-                "AI response failed validation"
-            ) from exc
-        if not isinstance(data, dict):
-            raise AIValidationError("AI response failed validation")
-        return data
+            return parse_model_json(await self._complete(system_prompt, prompt), model)
+        except AIValidationError:
+            logger.warning("Writer returned an invalid reply; retrying once")
+        return parse_model_json(await self._complete(system_prompt, prompt), model)

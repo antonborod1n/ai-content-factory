@@ -6,6 +6,11 @@ import re
 _WORD_CHAR_RE = re.compile(r"[^\W_]", re.UNICODE)
 
 
+def count_characters(content_markdown: str) -> int:
+    """Count characters in Markdown source, including spaces (Dzen length)."""
+    return len(content_markdown or "")
+
+
 def count_words(content_markdown: str) -> int:
     """Count words in Markdown source.
 

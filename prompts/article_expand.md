@@ -13,6 +13,14 @@ CTA: {{cta}}
 
 {{brief_json}}
 
+## База знаний
+
+{{knowledge_context}}
+
+## Анализ конкурентов
+
+{{competitor_context}}
+
 ## Текущая статья
 
 title: {{current_title}}

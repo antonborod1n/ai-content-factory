@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.config import get_settings
 from app.db.models import Base  # noqa: F401 — register models on metadata
 from app.db.models.article import Article  # noqa: F401
+from app.db.models.discovery import ContentPlan, ContentPlanTopic  # noqa: F401
+from app.db.models.document import Chunk, Document  # noqa: F401
+from app.db.models.research import ResearchCompetitor, ResearchRun  # noqa: F401
+from app.db.models.run import Run, RunStep  # noqa: F401
 
 config = context.config
 

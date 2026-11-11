@@ -25,6 +25,7 @@ def test_article_columns() -> None:
     columns = Article.__table__.columns
     assert set(columns.keys()) == {
         "id",
+        "project_id",
         "topic",
         "language",
         "audience",
@@ -36,6 +37,13 @@ def test_article_columns() -> None:
         "word_count",
         "status",
         "error_message",
+        "pipeline",
+        "assets",
+        "internal_links",
+        "dzen",
+        "quality",
+        "competitor_sources",
+        "review_status",
         "created_at",
         "updated_at",
     }
@@ -43,6 +51,9 @@ def test_article_columns() -> None:
     assert isinstance(columns["topic"].type, Text)
     assert columns["language"].type.length == 10
     assert isinstance(columns["keywords"].type, JSONB)
+    assert isinstance(columns["pipeline"].type, JSONB)
+    assert isinstance(columns["assets"].type, JSONB)
+    assert isinstance(columns["internal_links"].type, JSONB)
     assert isinstance(columns["word_count"].type, Integer)
     assert columns["title"].nullable is True
     assert columns["meta_description"].nullable is True
@@ -51,6 +62,15 @@ def test_article_columns() -> None:
     assert columns["content_markdown"].nullable is True
     assert columns["word_count"].nullable is True
     assert columns["error_message"].nullable is True
+    assert columns["pipeline"].nullable is True
+    assert columns["assets"].nullable is True
+    assert columns["internal_links"].nullable is True
+    assert columns["dzen"].nullable is True
+    assert isinstance(columns["dzen"].type, JSONB)
+    assert columns["quality"].nullable is True
+    assert isinstance(columns["quality"].type, JSONB)
+    assert columns["competitor_sources"].nullable is True
+    assert isinstance(columns["competitor_sources"].type, JSONB)
     assert columns["topic"].nullable is False
     assert columns["status"].nullable is False
 

@@ -28,7 +28,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from app.core.topics_file import load_topics
+from app.core.topics_file import apply_content_flags, apply_use_dzen, load_topics
 
 DEFAULT_API_BASE_URL = "http://localhost:8000"
 GENERATE_PATH = "/api/v1/articles/generate"
@@ -39,13 +39,17 @@ def generate_article(
     api_base_url: str,
     payload: dict[str, Any],
     timeout_seconds: float,
+    project_slug: str = "default",
 ) -> dict[str, Any]:
     url = api_base_url.rstrip("/") + GENERATE_PATH
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = Request(
         url,
         data=body,
-        headers={"Content-Type": "application/json; charset=utf-8"},
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "X-Project-Slug": project_slug,
+        },
         method="POST",
     )
     with urlopen(request, timeout=timeout_seconds) as response:
@@ -60,6 +64,11 @@ def main(argv: list[str] | None = None) -> int:
         "topics_file",
         type=Path,
         help="Path to topics.json / topics.txt (see topics/*.example.*)",
+    )
+    parser.add_argument(
+        "--project",
+        default=os.environ.get("ACF_PROJECT", "default"),
+        help="Project slug (default: env ACF_PROJECT or default)",
     )
     parser.add_argument(
         "--api-base-url",
@@ -79,6 +88,33 @@ def main(argv: list[str] | None = None) -> int:
         "--stop-on-error",
         action="store_true",
         help="Abort on the first failed topic (default: continue)",
+    )
+    dzen = parser.add_mutually_exclusive_group()
+    dzen.add_argument(
+        "--dzen",
+        action="store_true",
+        help="Generate a Dzen version for every topic (overrides topics file)",
+    )
+    dzen.add_argument(
+        "--no-dzen",
+        action="store_true",
+        help="Skip Dzen for every topic (overrides topics file)",
+    )
+    content = parser.add_mutually_exclusive_group()
+    content.add_argument(
+        "--text-only",
+        action="store_true",
+        help="Write the article only; skip image generation",
+    )
+    content.add_argument(
+        "--images-only",
+        action="store_true",
+        help="Regenerate images only (requires --article-id)",
+    )
+    parser.add_argument(
+        "--article-id",
+        default=None,
+        help="Existing article UUID for --images-only",
     )
     args = parser.parse_args(argv)
 
@@ -102,8 +138,21 @@ def main(argv: list[str] | None = None) -> int:
     print(f"api: {api_base_url.rstrip('/')}{GENERATE_PATH}")
     print(f"topics: {len(topics)} from {path}")
 
+    if args.images_only and not args.article_id:
+        print("--images-only requires --article-id", file=sys.stderr)
+        return 2
+
+    dzen_override = True if args.dzen else False if args.no_dzen else None
+
     failures = 0
     for index, payload in enumerate(topics, start=1):
+        payload = apply_use_dzen(payload, dzen_override)
+        payload = apply_content_flags(
+            payload,
+            text_only=args.text_only,
+            images_only=args.images_only,
+            article_id=args.article_id,
+        )
         topic = payload["topic"]
         print(f"[{index}/{len(topics)}] {topic}")
         try:
@@ -111,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
                 api_base_url=api_base_url,
                 payload=payload,
                 timeout_seconds=args.timeout,
+                project_slug=args.project,
             )
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:500]

@@ -64,3 +64,16 @@ def test_placeholder_numbering_is_unique_across_sections() -> None:
     # The single infographic belongs to the first section, so later sections
     # would continue from number two if they had one.
     assert [plan.first_infographic_number for plan in plans] == [1, 2, 2]
+
+
+def test_plans_use_research_section_image_counts() -> None:
+    request = ArticleWriteInput(
+        topic="Тема",
+        outline=["Жесткий", "Мягкий", "FAQ"],
+        image_placeholders=3,
+        section_image_placeholders=[2, 0, 1],
+    )
+    plans = build_section_plans(request, target_word_count=3000)
+
+    assert [plan.image_placeholders for plan in plans] == [2, 0, 1]
+    assert [plan.first_image_number for plan in plans] == [1, 3, 3]

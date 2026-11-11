@@ -27,3 +27,10 @@ def test_empty_content_is_zero() -> None:
     assert count_words("") == 0
     assert count_words("\n\n   ") == 0
     assert count_words("### --- ***") == 0
+
+
+def test_count_characters_includes_spaces() -> None:
+    from app.core.word_count import count_characters
+
+    assert count_characters("аб в") == 4
+    assert count_characters("") == 0

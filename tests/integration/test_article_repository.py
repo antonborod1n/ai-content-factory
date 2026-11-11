@@ -134,3 +134,41 @@ async def test_list_articles_ordered_and_filterable(
     assert len(offset_page) == 1
     assert offset_page[0].id != limited[0].id
     assert first.id in {all_articles[0].id, all_articles[1].id, all_articles[2].id}
+
+    assert await article_repository.count() == 3
+    assert await article_repository.count(status=ArticleStatus.FAILED) == 1
+
+
+@pytest.mark.asyncio
+async def test_list_link_targets_returns_completed_with_slug(
+    article_repository: ArticleRepository,
+) -> None:
+    usable = await article_repository.create(topic="Usable")
+    usable = await article_repository.update(
+        usable.id,
+        status=ArticleStatus.COMPLETED,
+        title="Как выбрать жесткость",
+        url_slug="kak-vybrat-zhestkost",
+        language="ru",
+    )
+    pending = await article_repository.create(topic="Pending")
+    other_lang = await article_repository.create(topic="English", language="en")
+    await article_repository.update(
+        other_lang.id,
+        status=ArticleStatus.COMPLETED,
+        title="Firmness",
+        url_slug="firmness",
+    )
+    empty_slug = await article_repository.create(topic="Empty slug")
+    await article_repository.update(
+        empty_slug.id,
+        status=ArticleStatus.COMPLETED,
+        title="No slug",
+        url_slug="",
+    )
+
+    rows = await article_repository.list_link_targets(
+        language="ru",
+        exclude_id=pending.id,
+    )
+    assert [item.id for item in rows] == [usable.id]

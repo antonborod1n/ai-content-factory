@@ -310,6 +310,72 @@ async def test_openai_writer_writes_long_articles_section_by_section() -> None:
     assert "Первый" in second_section_prompt
 
 
+_META_JSON = (
+    '{"title": "Матрасы", "meta_description": "Описание", "url_slug": "matrasy"}'
+)
+
+
+def _section_json(heading: str, words: int) -> str:
+    body = " ".join(["слово"] * words)
+    return f'{{"content_markdown": "## **{heading}**\\n\\n{body}"}}'
+
+
+@pytest.mark.asyncio
+async def test_openai_writer_expands_a_short_section() -> None:
+    client = AsyncMock()
+    client.chat.completions.create = AsyncMock(
+        side_effect=[
+            _completion(_META_JSON),
+            _completion(_section_json("Первый", 5)),
+            _completion(_section_json("Первый", 200)),
+            _completion(_section_json("Второй", 200)),
+        ]
+    )
+    # 400 words over two sections: each must reach 80% of 200.
+    writer = OpenAIWriter(
+        settings=_settings(target_word_count=400, expand_attempts=2),
+        client=client,
+    )
+
+    result = await writer.generate(
+        ArticleWriteInput(topic="Матрасы", outline=["Первый", "Второй"])
+    )
+
+    assert client.chat.completions.create.await_count == 4
+    assert result.word_count == 1 + 201 + 201
+    retry_prompt = client.chat.completions.create.await_args_list[2].kwargs[
+        "messages"
+    ][1]["content"]
+    assert "Доработка раздела" in retry_prompt
+    assert "## **Первый**\n\nслово слово слово слово слово" in retry_prompt
+
+
+@pytest.mark.asyncio
+async def test_openai_writer_keeps_a_section_when_its_expansion_fails() -> None:
+    client = AsyncMock()
+    client.chat.completions.create = AsyncMock(
+        side_effect=[
+            _completion(_META_JSON),
+            _completion(_section_json("Первый", 5)),
+            APIError(message="provider is down", request=None, body=None),
+            _completion(_section_json("Второй", 200)),
+        ]
+    )
+    writer = OpenAIWriter(
+        settings=_settings(target_word_count=400, expand_attempts=2),
+        client=client,
+    )
+
+    result = await writer.generate(
+        ArticleWriteInput(topic="Матрасы", outline=["Первый", "Второй"])
+    )
+
+    assert "## **Первый**\n\nслово слово слово слово слово\n\n" in (
+        result.content_markdown
+    )
+    assert result.word_count == 1 + 6 + 201
+
+
 @pytest.mark.asyncio
 async def test_openai_writer_uses_one_call_without_an_outline() -> None:
     client = AsyncMock()
@@ -342,13 +408,15 @@ def test_openai_writer_uses_default_endpoint_when_base_url_unset(
         return object()
 
     monkeypatch.setattr(
-        "app.services.ai.openai_writer.AsyncOpenAI",
+        "app.services.ai.openai_client.AsyncOpenAI",
         fake_client,
     )
     writer = OpenAIWriter(settings=_settings())
     assert writer.base_url is None
     writer._get_client()
     assert "base_url" not in captured
+    assert captured["timeout"] == 300.0
+    assert captured["max_retries"] == 1
 
 
 def test_openai_writer_passes_custom_base_url(
@@ -361,7 +429,7 @@ def test_openai_writer_passes_custom_base_url(
         return object()
 
     monkeypatch.setattr(
-        "app.services.ai.openai_writer.AsyncOpenAI",
+        "app.services.ai.openai_client.AsyncOpenAI",
         fake_client,
     )
     writer = OpenAIWriter(

@@ -13,6 +13,22 @@ def test_article_write_input_defaults() -> None:
     assert payload.keywords == []
     assert payload.primary_keywords == []
     assert payload.word_count is None
+    assert payload.knowledge_context == ""
+    assert payload.use_knowledge_base is True
+    assert payload.use_competitor_research is False
+    assert payload.competitor_context == ""
+    assert payload.competitor_sources == []
+    assert payload.section_image_placeholders == []
+    assert payload.competitor_image_sections == []
+    assert payload.use_multi_agent is False
+    assert payload.use_text is True
+    assert payload.use_images is False
+    assert payload.article_id is None
+    assert payload.use_internal_links is True
+    assert payload.use_dzen is False
+    assert payload.use_detectors is False
+    assert payload.use_humanizer is False
+    assert payload.use_summary is False
 
 
 def test_article_write_input_syncs_keywords() -> None:

@@ -2,7 +2,32 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# Parsed model replies: an extra key (e.g. "reasoning") must not fail the step.
+# API request bodies stay extra="forbid".
+MODEL_OUTPUT_CONFIG = ConfigDict(extra="ignore")
+
+
+class CompetitorSourceRef(BaseModel):
+    """One analyzed competitor URL (no page body)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rank: int = Field(default=0, ge=0)
+    title: str = ""
+    url: str = Field(min_length=1)
+
+
+class SectionImageCount(BaseModel):
+    """Photos counted under one competitor heading."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    heading: str
+    image_count: int = Field(default=0, ge=0)
 
 
 class ArticleWriteInput(BaseModel):
@@ -29,8 +54,37 @@ class ArticleWriteInput(BaseModel):
     faq_count: int = Field(default=5, ge=0)
     image_placeholders: int = Field(default=3, ge=0)
     infographic_placeholders: int = Field(default=1, ge=0)
+    # Per-outline photo counts from competitor averages. Empty = even spread.
+    section_image_placeholders: list[int] = Field(default_factory=list)
+    competitor_image_sections: list[list[SectionImageCount]] = Field(
+        default_factory=list
+    )
     cta: str = ""
     outline: list[str] = Field(default_factory=list)
+    # Filled by ArticleService from the knowledge base; not an API field.
+    knowledge_context: str = ""
+    use_knowledge_base: bool = True
+    # Stage 3 — competitor research. research_id / flag are API fields;
+    # competitor_context is filled by ArticleService after research.
+    use_competitor_research: bool = False
+    research_id: uuid.UUID | None = None
+    competitor_context: str = ""
+    # Filled by ResearchService after SERP; persisted and written to article.md.
+    competitor_sources: list[CompetitorSourceRef] = Field(default_factory=list)
+    # Stage 4 — run Research → SEO → Writer → Fact Checker → Editor.
+    use_multi_agent: bool = False
+    # Stage 5 — replace placeholders with generated images; link other articles.
+    use_text: bool = True
+    use_images: bool = False
+    # Existing article for images-only regenerate (use_text=false).
+    article_id: uuid.UUID | None = None
+    use_internal_links: bool = True
+    # Stage 6 — shorter Dzen version of the same article (from the main title).
+    use_dzen: bool = False
+    # Stage 6 quality — detectors, humanizer, short summary (all opt-in).
+    use_detectors: bool = False
+    use_humanizer: bool = False
+    use_summary: bool = False
 
     @model_validator(mode="after")
     def _sync_keyword_fields(self) -> ArticleWriteInput:
@@ -73,15 +127,29 @@ class ArticleWriteInput(BaseModel):
             "faq_count": self.faq_count,
             "image_placeholders": self.image_placeholders,
             "infographic_placeholders": self.infographic_placeholders,
+            "section_image_placeholders": self.section_image_placeholders,
             "cta": self.cta,
             "outline": self.outline,
         }
 
 
+class CompetitorPlanOutput(BaseModel):
+    """Improved outline and SEO hints from competitor analysis."""
+
+    model_config = MODEL_OUTPUT_CONFIG
+
+    outline: list[str] = Field(min_length=2)
+    title_hint: str = ""
+    meta_description_hint: str = ""
+    url_slug_hint: str = ""
+    article_goal: str = ""
+    notes: str = ""
+
+
 class AIArticleMetaOutput(BaseModel):
     """SEO wrapper returned before the body is written section by section."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = MODEL_OUTPUT_CONFIG
 
     title: str = Field(min_length=1)
     meta_description: str = Field(min_length=1)
@@ -91,7 +159,7 @@ class AIArticleMetaOutput(BaseModel):
 class AISectionOutput(BaseModel):
     """Markdown of a single article section."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = MODEL_OUTPUT_CONFIG
 
     content_markdown: str = Field(min_length=1)
 
@@ -99,7 +167,7 @@ class AISectionOutput(BaseModel):
 class AIArticleOutput(BaseModel):
     """Structured AI article payload (validated before persistence)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = MODEL_OUTPUT_CONFIG
 
     title: str = Field(min_length=1)
     meta_description: str = Field(min_length=1)

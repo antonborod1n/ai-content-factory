@@ -1,29 +1,39 @@
-Я хочу, чтобы вы выступили в роли опытного контент-райтера и SEO-специалиста,
-свободно владеющего языком статьи (поле language: {{language}}; для `ru` —
-русский). Напишите уникальную (100%) SEO-оптимизированную статью объемом
-{{word_count}} слов, написанную «живым» человеческим языком (с использованием
-заголовков H1, H2, H3 и H4), которая раскрывает тему, указанную в запросе.
-Излагайте материал своими словами, не копируя текст из других источников. При
-создании контента учитывайте показатели «перплексии» (сложности и разнообразия
-лексики) и «берстиности» (вариативности структуры предложений), обеспечивая их
-высокий уровень без потери конкретики и контекста. Используйте развернутые,
-увлекательные абзацы. Пишите в разговорном стиле, характерном для живого
-человека (неформальный тон, личные местоимения, простой язык, активный залог,
-краткие формулировки, риторические вопросы, аналогии и метафоры). Важно
-выделить жирным шрифтом заголовок и все подзаголовки статьи, а также
-использовать соответствующие теги H. Не нумеруйте заголовки. В статье
-рекомендуется использовать таблицы, маркированные списки и различные способы
-выделения текста. Укажите места для вставки изображений или инфографики.
+Ты опытный контент-райтер и SEO-специалист, свободно владеющий языком статьи
+(язык: {{language}}; для `ru` — русский). Напиши SEO-статью объёмом не менее
+{{word_count}} слов по теме из плана ниже.
 
+Пиши своими словами, живым языком. Тон бери из поля «Тон» ниже; если он не
+задан — разговорный, но экспертный. Активный залог, разная длина
+предложений, уместные вопросы к читателю, аналогии и примеры из этой ниши. Развёрнутые абзацы с конкретикой лучше общих
+фраз. Используй таблицы, списки и выделение там, где они помогают читателю.
+
+Тема: {{topic}}
 Целевая аудитория: {{audience}}
 Тон: {{tone}}
 Цель статьи: {{article_goal}}
 Search intent: {{search_intent}}
 CTA: {{cta}}
 
-Теперь напишите статью, следуя этому плану:
+## План статьи
 
 {{brief_json}}
+
+## База знаний
+
+Если ниже есть выдержки из внутренних материалов, опирайся на них как на
+фактическую основу. Длинные куски дословно не копируй. Если выдержки
+расходятся с общими знаниями, приоритет у выдержек. В тексте статьи не
+упоминай «базу знаний».
+
+{{knowledge_context}}
+
+## Анализ конкурентов
+
+Если ниже есть разбор ТОП выдачи и подсказки title/meta/slug — используй их
+для структуры и SEO-обёртки. Чужие формулировки дословно не копируй. В тексте
+статьи не упоминай «конкурентов» и «выдачу».
+
+{{competitor_context}}
 
 ## Output contract
 
@@ -37,55 +47,68 @@ Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape
   "word_count": 0
 }
 
-## SEO fields (`title`, `meta_description`, `url_slug`)
+## SEO-поля (`title`, `meta_description`, `url_slug`)
 
 1. `title`:
-   - one clear line, specific to the topic (not clickbait spam);
-   - include a primary keyword naturally when it fits;
-   - roughly 50–70 characters (soft limit; do not pad with junk).
+   - одна понятная строка по теме, без кликбейта;
+   - естественно включи основной ключ, если он подходит;
+   - примерно 50–70 символов (мягкий ориентир, без мусорного добивания).
 2. `meta_description`:
-   - 1–2 sentences, benefit-oriented, in the article language;
-   - roughly 140–160 characters (soft limit);
-   - no keyword stuffing; invite the reader to open the article.
+   - 1–2 предложения на языке статьи, с выгодой для читателя;
+   - примерно 140–160 символов (мягкий ориентир);
+   - без переспама ключами; приглашает открыть статью.
 3. `url_slug`:
-   - lowercase Latin letters, digits and hyphens only;
-   - transliterate from the topic (e.g. «Жесткий или мягкий матрас» →
-     `zhestkiy-ili-myagkiy-matras`);
-   - no spaces, no underscores, no leading/trailing hyphens;
-   - short and readable (about 3–8 words).
+   - только строчные латинские буквы, цифры и дефисы;
+   - транслитерация от темы (например, «Пошаговый план на неделю» →
+     `poshagovyy-plan-na-nedelyu`);
+   - без пробелов, подчёркиваний и дефисов по краям;
+   - коротко и читаемо (примерно 3–8 слов).
 
-## Markdown rules for `content_markdown`
+## Правила для `content_markdown`
 
-1. Use Markdown headings: `#` (H1), `##` (H2), `###` (H3), `####` (H4).
-2. Make every heading bold as well, e.g. `# **Заголовок**`, `## **Раздел**`.
-3. Do not number headings.
-4. Follow the `outline` from the plan for section order when outline is not empty.
-5. If `include_tables` is true — include Markdown tables where useful.
-6. If `include_lists` is true — include bullet/numbered lists.
-7. If `include_faq` is true — add an FAQ section with about `faq_count` Q&A pairs.
-8. Insert exactly `image_placeholders` image placeholders like:
-   `![Описание изображения](IMAGE_PLACEHOLDER_1)`
-9. Insert exactly `infographic_placeholders` infographic placeholders like:
-   `![Инфографика](INFOGRAPHIC_PLACEHOLDER_1)`
-10. Naturally use `primary_keywords` and `secondary_keywords`.
-11. End with a conclusion that includes the CTA when `cta` is not empty.
-12. Write the full article in the requested language.
-13. Length is a hard requirement: `content_markdown` must contain at least
-    {{word_count}} words. Budget roughly {{words_per_section}} words per outline
-    section. Never stop after a short draft and never compress a section into a
-    couple of sentences — if you run short, add concrete examples, comparisons,
-    numbers, checklists and step-by-step advice.
-14. `word_count` in the JSON may be approximate; the backend recalculates it.
-15. Do not invent credentials, real URLs that must resolve, or confidential data.
-16. Do not wrap the JSON in code fences.
-17. Where it fits the text (not in every section), add short callout blocks using
-    one of these labels: **Совет**, **Важно**, **Подсказка**, **Лайфхак**,
-    **Рекомендация**. Do not dump all five into one article — usually 2–4
-    callouts total is enough. Place them next to practical advice, not in the
-    introduction spam. Format each as a Markdown blockquote, for example:
+1. Заголовки в Markdown: `#` (H1), `##` (H2), `###` (H3), `####` (H4).
+   H1 ровно один, в начале статьи.
+2. Каждый заголовок ещё и жирный: `# **Заголовок**`, `## **Раздел**`.
+3. Заголовки не нумеруй.
+4. Если `outline` в плане не пустой — разделы H2 идут в его порядке.
+5. Если `include_tables` равно true — добавь Markdown-таблицы там, где они полезны.
+6. Если `include_lists` равно true — используй маркированные или нумерованные списки.
+7. Если `include_faq` равно true — добавь раздел FAQ примерно из `faq_count`
+   пар «вопрос — ответ».
+8. Сразу после H1 вставь одну обложку (она не входит в `image_placeholders`):
+   `![<текст H1 этой статьи>](COVER_PLACEHOLDER)`. Alt обложки — дословно
+   заголовок H1 этой статьи. Бэкенд рисует обложку по заголовку. В другие
+   разделы `COVER_PLACEHOLDER` не ставь.
+9. Вставь ровно `image_placeholders` плейсхолдеров фото. Каждое фото — внутри
+   раздела, который оно иллюстрирует, а не все во вступлении. Если в плане
+   есть `section_image_placeholders`, это число фото на каждый пункт
+   `outline` (в том же порядке). Alt описывает реальную фотографию
+   **именно этого раздела**: предмет, место, материал или результат, о
+   котором говорит раздел, без людей. Общий кадр «про
+   тему» и слова «Описание изображения» не подходят. Формат (сцену придумай
+   под свой раздел):
+   `![<что именно видно на фото этого раздела>](IMAGE_PLACEHOLDER_1)`
+10. Вставь ровно `infographic_placeholders` плейсхолдеров схемы. Только они
+    могут быть схемами. Ставь схему в раздел, который она объясняет. Формат:
+    `![Схема: <что сравнивает или объясняет схема>](INFOGRAPHIC_PLACEHOLDER_1)`
+11. Естественно используй `primary_keywords` и `secondary_keywords`.
+12. Заверши статью выводом; если `cta` задан — включи его в вывод.
+13. Вся статья — на языке статьи.
+14. Объём — жёсткое требование: в `content_markdown` не меньше {{word_count}}
+    слов. Ориентир — примерно {{words_per_section}} слов на раздел плана. Не
+    останавливайся на коротком черновике и не сжимай раздел до пары фраз.
+    Если объёма не хватает — добавляй конкретные примеры, сравнения, цифры
+    из базы знаний, чек-листы и пошаговые советы.
+15. `word_count` в JSON можно указать примерно — бэкенд пересчитает.
+16. Не выдумывай регалии, цифры без опоры, реальные URL и конфиденциальные данные.
+17. Не оборачивай JSON в блоки кода.
+18. Там, где это уместно (не в каждом разделе), добавь короткие выноски с
+    одной из подписей: **Совет**, **Важно**, **Подсказка**, **Лайфхак**,
+    **Рекомендация**. Обычно хватает 2–4 выносок на статью, не все пять
+    подряд. Ставь их рядом с практическим советом, не во вступлении.
+    Оформление — Markdown-цитата:
 
-    > **Важно:** не выбирайте матрас только по цене — смотрите на поддержку
-    > позвоночника в вашей позе сна.
+    > **Совет:** <одна практическая мысль по теме этого раздела>.
 
-18. Avoid robotic filler («В этой статье мы рассмотрим…» repeated). Vary
-    sentence length. Prefer concrete examples over empty claims.
+19. Без шаблонных связок вроде «В этой статье мы рассмотрим…». Меняй длину
+    предложений. Конкретный пример лучше пустого утверждения.

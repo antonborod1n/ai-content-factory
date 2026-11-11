@@ -52,7 +52,7 @@ def build_section_plans(
 
     total = len(titles)
     per_section = max(target_word_count // total, MIN_SECTION_WORD_COUNT)
-    images = distribute(request.image_placeholders, total)
+    images = _section_image_counts(request, total)
     infographics = distribute(request.infographic_placeholders, total)
 
     plans: list[SectionPlan] = []
@@ -74,3 +74,10 @@ def build_section_plans(
         image_number += images[index]
         infographic_number += infographics[index]
     return plans
+
+
+def _section_image_counts(request: ArticleWriteInput, total: int) -> list[int]:
+    planned = [max(0, int(item)) for item in request.section_image_placeholders]
+    if len(planned) == total:
+        return planned
+    return distribute(request.image_placeholders, total)

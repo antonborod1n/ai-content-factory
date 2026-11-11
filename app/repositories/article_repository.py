@@ -5,17 +5,24 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.article import Article, ArticleStatus
+from app.db.models.article import Article, ArticleStatus, ReviewStatus
+from app.db.models.project import DEFAULT_PROJECT_ID
 
 
 class ArticleRepository:
     """Database access for the articles table."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        project_id: uuid.UUID | None = None,
+    ) -> None:
         self._session = session
+        self._project_id = project_id or DEFAULT_PROJECT_ID
 
     async def create(
         self,
@@ -32,6 +39,7 @@ class ArticleRepository:
         error_message: str | None = None,
     ) -> Article:
         article = Article(
+            project_id=self._project_id,
             topic=topic,
             language=language,
             audience=audience,
@@ -49,7 +57,10 @@ class ArticleRepository:
         return article
 
     async def get_by_id(self, article_id: uuid.UUID) -> Article | None:
-        return await self._session.get(Article, article_id)
+        article = await self._session.get(Article, article_id)
+        if article is None or article.project_id != self._project_id:
+            return None
+        return article
 
     async def update(self, article_id: uuid.UUID, **fields: Any) -> Article | None:
         article = await self.get_by_id(article_id)
@@ -72,10 +83,58 @@ class ArticleRepository:
         limit: int = 100,
         offset: int = 0,
         status: ArticleStatus | None = None,
+        review_status: ReviewStatus | None = None,
     ) -> list[Article]:
-        statement = select(Article).order_by(Article.created_at.desc())
+        statement = (
+            select(Article)
+            .where(Article.project_id == self._project_id)
+            .order_by(Article.created_at.desc())
+        )
         if status is not None:
             statement = statement.where(Article.status == status)
+        if review_status is not None:
+            statement = statement.where(Article.review_status == review_status)
         statement = statement.limit(limit).offset(offset)
+        result = await self._session.execute(statement)
+        return list(result.scalars().all())
+
+    async def count(
+        self,
+        *,
+        status: ArticleStatus | None = None,
+        review_status: ReviewStatus | None = None,
+    ) -> int:
+        statement = (
+            select(func.count())
+            .select_from(Article)
+            .where(Article.project_id == self._project_id)
+        )
+        if status is not None:
+            statement = statement.where(Article.status == status)
+        if review_status is not None:
+            statement = statement.where(Article.review_status == review_status)
+        result = await self._session.execute(statement)
+        return int(result.scalar_one())
+
+    async def list_link_targets(
+        self,
+        *,
+        language: str,
+        exclude_id: uuid.UUID,
+        limit: int = 50,
+    ) -> list[Article]:
+        """Completed articles that can be used as internal-link destinations."""
+        statement = (
+            select(Article)
+            .where(Article.project_id == self._project_id)
+            .where(Article.status == ArticleStatus.COMPLETED)
+            .where(Article.id != exclude_id)
+            .where(Article.language == language)
+            .where(Article.url_slug.isnot(None))
+            .where(Article.url_slug != "")
+            .where(Article.title.isnot(None))
+            .order_by(Article.created_at.desc())
+            .limit(limit)
+        )
         result = await self._session.execute(statement)
         return list(result.scalars().all())
