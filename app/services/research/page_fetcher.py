@@ -8,7 +8,7 @@ from typing import Protocol
 import httpx
 
 from app.config import Settings, get_settings
-from app.core.http_url import is_public_http_url
+from app.core.http_url import is_safe_fetch_url
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class HttpPageFetcher:
         self._client = client
 
     async def fetch(self, url: str) -> str | None:
-        if not is_public_http_url(url):
+        if not await is_safe_fetch_url(url):
             logger.info("Skipping non-public research URL")
             return None
 
@@ -62,6 +62,10 @@ class HttpPageFetcher:
         try:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
+            final_url = str(response.url)
+            if final_url != url and not await is_safe_fetch_url(final_url):
+                logger.info("Skipping redirect to a non-public research URL")
+                return None
             content_type = (response.headers.get("content-type") or "").lower()
             if "html" not in content_type and "text/plain" not in content_type:
                 return None

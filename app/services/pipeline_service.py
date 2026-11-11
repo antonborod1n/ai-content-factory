@@ -126,6 +126,26 @@ class PipelineService:
             }
         steps.append(fact_step)
 
+        if request.use_humanizer:
+            handoff = _fact_check_handoff(fact_check)
+            async with self._runs.step(run_id, "editor") as handle:
+                handle.skip()
+                handle.detail = {"note": "Правка вместе с хьюманайзером"}
+            steps.append(
+                PipelineStepTrace(
+                    name=PipelineStepName.EDITOR,
+                    status=PipelineStepStatus.SKIPPED,
+                    notes="Правка вместе с хьюманайзером",
+                )
+            )
+            logger.info(
+                "Editor deferred to humanizer fact_verdict=%s",
+                fact_check.verdict,
+            )
+            return draft, PipelineTrace(
+                enabled=True, steps=steps, editor_handoff=handoff
+            )
+
         async with self._runs.step(run_id, "editor") as handle:
             edited = await self._editor.edit(
                 EditorInput(
@@ -279,3 +299,20 @@ def _apply_seo_plan(
         updates["section_image_placeholders"] = remapped
         updates["image_placeholders"] = sum(remapped)
     return request.model_copy(update=updates)
+
+
+def _fact_check_handoff(fact_check: FactCheckOutput) -> str:
+    """Short notes the humanizer applies instead of a second full rewrite."""
+    lines = [f"Вердикт: {fact_check.verdict}"]
+    if fact_check.notes.strip():
+        lines.append(f"Заметки: {fact_check.notes.strip()}")
+    if not fact_check.issues:
+        lines.append("Замечаний нет.")
+        return "\n".join(lines)
+    for index, issue in enumerate(fact_check.issues, start=1):
+        suggestion = issue.suggestion.strip() or "смягчить формулировку"
+        lines.append(
+            f"{index}. [{issue.severity}] {issue.claim} — {issue.problem}. "
+            f"Как исправить: {suggestion}"
+        )
+    return "\n".join(lines)

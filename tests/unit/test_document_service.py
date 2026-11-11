@@ -64,6 +64,12 @@ class FakeDocumentRepository:
         items = list(self.documents.values())
         return items[offset : offset + limit]
 
+    async def list_with_chunk_counts(
+        self, *, limit: int = 100, offset: int = 0
+    ) -> list[tuple[Document, int]]:
+        items = list(self.documents.values())[offset : offset + limit]
+        return [(doc, len(self.chunks.get(doc.id, []))) for doc in items]
+
     async def count(self) -> int:
         return len(self.documents)
 

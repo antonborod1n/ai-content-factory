@@ -9,7 +9,6 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.project import DEFAULT_PROJECT_ID
 from app.db.models.run import Run, RunStep
 
 _STEP_STATUSES = {"running", "completed", "failed", "skipped"}
@@ -23,10 +22,10 @@ class RunRepository:
         self,
         session: AsyncSession,
         *,
-        project_id: uuid.UUID | None = None,
+        project_id: uuid.UUID,
     ) -> None:
         self._session = session
-        self._project_id = project_id or DEFAULT_PROJECT_ID
+        self._project_id = project_id
 
     async def create(
         self,

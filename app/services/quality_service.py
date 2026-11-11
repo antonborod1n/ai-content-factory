@@ -70,6 +70,7 @@ class QualityService:
         use_detectors: bool,
         use_humanizer: bool,
         use_summary: bool,
+        fact_check_notes: str = "",
     ) -> QualityRunResult:
         report = QualityReport()
         current = output
@@ -92,6 +93,7 @@ class QualityService:
                 language=language,
                 audience=audience,
                 detector_notes=detector_notes,
+                fact_check_notes=fact_check_notes,
             )
 
         if use_summary:
@@ -149,6 +151,7 @@ class QualityService:
         language: str,
         audience: str,
         detector_notes: str,
+        fact_check_notes: str,
     ) -> tuple[AIArticleOutput, HumanizerReport]:
         try:
             rewritten = await self._humanizer.humanize(
@@ -160,6 +163,7 @@ class QualityService:
                     language=language,
                     audience=audience,
                     detector_notes=detector_notes,
+                    fact_check_notes=fact_check_notes,
                 )
             )
         except AIConfigurationError:

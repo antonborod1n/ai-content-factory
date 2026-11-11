@@ -58,6 +58,16 @@ function errorDetail(body: unknown, fallback: string): string {
   return fallback;
 }
 
+function abortedRequest(error: unknown): ApiError | null {
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return new ApiError(0, "Запрос оборвался по времени");
+  }
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return new ApiError(0, "Запрос оборвался");
+  }
+  return null;
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     let detail = response.statusText || "Запрос не выполнен";
@@ -72,8 +82,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, { headers: projectHeaders() });
-  return parseResponse<T>(response);
+  try {
+    const response = await fetch(`${BASE}${path}`, { headers: projectHeaders() });
+    return await parseResponse<T>(response);
+  } catch (error) {
+    throw abortedRequest(error) ?? error;
+  }
 }
 
 export async function apiPatchJson<T>(path: string, body: unknown): Promise<T> {
@@ -91,13 +105,17 @@ export async function apiPostJson<T>(
   body: unknown,
   projectId?: string,
 ): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...projectHeaders(projectId) },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(LONG_REQUEST_MS),
-  });
-  return parseResponse<T>(response);
+  try {
+    const response = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...projectHeaders(projectId) },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(LONG_REQUEST_MS),
+    });
+    return await parseResponse<T>(response);
+  } catch (error) {
+    throw abortedRequest(error) ?? error;
+  }
 }
 
 export async function apiDelete(path: string): Promise<void> {
@@ -112,11 +130,15 @@ export async function apiDelete(path: string): Promise<void> {
 }
 
 export async function apiPostForm<T>(path: string, body: FormData): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: projectHeaders(),
-    body,
-    signal: AbortSignal.timeout(LONG_REQUEST_MS),
-  });
-  return parseResponse<T>(response);
+  try {
+    const response = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: projectHeaders(),
+      body,
+      signal: AbortSignal.timeout(LONG_REQUEST_MS),
+    });
+    return await parseResponse<T>(response);
+  } catch (error) {
+    throw abortedRequest(error) ?? error;
+  }
 }

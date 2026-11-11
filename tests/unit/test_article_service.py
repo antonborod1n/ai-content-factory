@@ -20,7 +20,7 @@ from app.schemas.ai import AIArticleOutput, ArticleWriteInput
 from app.services.ai.mock_detector import MockAiDetector
 from app.services.ai.mock_dzen import MockDzenWriter
 from app.services.ai.mock_editor import MockEditor
-from app.services.ai.mock_fact_checker import MockFactChecker
+from app.services.ai.mock_fact_checker import MockFactChecker, needs_revision_output
 from app.services.ai.mock_humanizer import MockHumanizer
 from app.services.ai.mock_image import MINIMAL_PNG, MockImageProvider
 from app.services.ai.mock_seo_agent import MockSeoAgent
@@ -432,6 +432,40 @@ async def test_generate_multi_agent_persists_editor_output_and_trace() -> None:
     names = [step["name"] for step in article.pipeline["steps"]]
     assert names == ["research", "seo", "writer", "fact_checker", "editor"]
     assert article.pipeline["steps"][0]["status"] == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_humanizer_applies_fact_check_without_a_second_rewrite() -> None:
+    repository = FakeArticleRepository()
+    writer = MockAIWriter()
+    editor = MockEditor()
+    humanizer = MockHumanizer()
+    pipeline = PipelineService(
+        writer,
+        MockSeoAgent(),
+        MockFactChecker(output=needs_revision_output()),
+        editor,
+        enabled=True,
+        default_word_count=3000,
+    )
+    service = ArticleService(
+        repository,
+        writer,
+        pipeline_service=pipeline,
+        quality_service=_quality_service(humanizer=humanizer),
+        output_dir="",
+    )
+
+    article = await service.generate(
+        _request(use_multi_agent=True, use_humanizer=True, use_internal_links=False)
+    )
+
+    assert editor.calls == []
+    assert "Неподтверждённая цифра" in humanizer.calls[0].fact_check_notes
+    assert "Текст звучит естественнее" in (article.content_markdown or "")
+    assert article.pipeline is not None
+    assert article.pipeline["steps"][-1]["status"] == "skipped"
+    assert "editor_handoff" not in article.pipeline
 
 
 @pytest.mark.asyncio

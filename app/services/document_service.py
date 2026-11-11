@@ -103,12 +103,10 @@ class DocumentService:
     async def list(
         self, *, limit: int = 100, offset: int = 0
     ) -> tuple[list[tuple[Document, int]], int]:
-        documents = await self._repository.list(limit=limit, offset=offset)
+        items = await self._repository.list_with_chunk_counts(
+            limit=limit, offset=offset
+        )
         total = await self._repository.count()
-        items: list[tuple[Document, int]] = []
-        for document in documents:
-            count = await self._repository.chunk_count(document.id)
-            items.append((document, count))
         return items, total
 
     async def delete(self, document_id: uuid.UUID) -> None:

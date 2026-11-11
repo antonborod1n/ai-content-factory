@@ -169,7 +169,10 @@ class ArticleService:
             assets, links, output, trace = await self._write_article(
                 request, article, run_id
             )
-            quality_result = await self._tracked_quality(run_id, request, output)
+            handoff = trace.editor_handoff if trace is not None else ""
+            quality_result = await self._tracked_quality(
+                run_id, request, output, fact_check_notes=handoff
+            )
             if quality_result is not None:
                 output = quality_result.output
             dzen_result = await self._tracked_dzen(run_id, request, output)
@@ -428,9 +431,13 @@ class ArticleService:
         run_id: uuid.UUID | None,
         request: ArticleWriteInput,
         output: AIArticleOutput,
+        *,
+        fact_check_notes: str = "",
     ) -> QualityRunResult | None:
         async with self._runs.step(run_id, "quality") as handle:
-            result = await self._maybe_quality(request, output)
+            result = await self._maybe_quality(
+                request, output, fact_check_notes=fact_check_notes
+            )
             if result is None:
                 handle.skip()
             else:
@@ -574,7 +581,11 @@ class ArticleService:
             return DzenWriteResult(article=DzenArticle(status="failed"))
 
     async def _maybe_quality(
-        self, request: ArticleWriteInput, output: AIArticleOutput
+        self,
+        request: ArticleWriteInput,
+        output: AIArticleOutput,
+        *,
+        fact_check_notes: str = "",
     ) -> QualityRunResult | None:
         wanted = request.use_detectors or request.use_humanizer or request.use_summary
         if not wanted:
@@ -589,6 +600,7 @@ class ArticleService:
                 use_detectors=request.use_detectors,
                 use_humanizer=request.use_humanizer,
                 use_summary=request.use_summary,
+                fact_check_notes=fact_check_notes,
             )
         except Exception:
             logger.exception("Quality checks failed; main article is unchanged")

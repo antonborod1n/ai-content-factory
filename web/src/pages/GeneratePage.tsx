@@ -16,7 +16,7 @@ import { useRef, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 
 import { fetchTopicBriefs, generateArticle, type TopicBrief } from "../api/articles";
-import { currentProjectId } from "../api/client";
+import { ApiError, currentProjectId } from "../api/client";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { trackGeneration } from "../generationActivity";
 import { loadGenerateDefaults } from "../generateDefaults";
@@ -68,6 +68,40 @@ type FlagName = (typeof FLAGS)[number]["name"];
 type FlagValues = Record<FlagName, boolean>;
 type GenerateMode = "plan" | "single";
 type PlanListFilter = "all" | "picked";
+
+const FLAG_MINUTES: Record<FlagName, number> = {
+  use_knowledge_base: 1,
+  use_competitor_research: 3,
+  use_multi_agent: 4,
+  use_images: 3,
+  use_dzen: 2,
+  use_detectors: 1,
+  use_humanizer: 2,
+  use_summary: 1,
+};
+
+function hoursPhrase(hours: number): string {
+  const mod10 = hours % 10;
+  const mod100 = hours % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? "часа" : "часов";
+  return `около ${hours} ${word}`;
+}
+
+/** Rough wait for the operator. The server keeps writing after a browser timeout. */
+function estimateMinutes(flags: FlagValues, count = 1): string {
+  const extra = FLAGS.reduce(
+    (sum, flag) => sum + (flags[flag.name] ? FLAG_MINUTES[flag.name] : 0),
+    0,
+  );
+  const total = (4 + extra) * Math.max(count, 1);
+  if (total < 8) {
+    return "около 5 минут";
+  }
+  if (total >= 90) {
+    return hoursPhrase(Math.max(1, Math.round(total / 60)));
+  }
+  return `около ${total} минут`;
+}
 
 function sharedFlags(items: TopicBrief[]): FlagValues {
   const flags = {} as FlagValues;
@@ -222,6 +256,13 @@ export function GeneratePage() {
           written += 1;
           refreshArticleLists();
         } catch (error) {
+          if (error instanceof ApiError && error.status === 0) {
+            failures.push(
+              `${brief.topic}: запрос оборвался, сервер может дописывать статью. Смотрите список «Статьи».`,
+            );
+            refreshArticleLists();
+            continue;
+          }
           const message = error instanceof Error ? error.message : "ошибка";
           failures.push(`${brief.topic}: ${message}`);
         }
@@ -317,7 +358,8 @@ export function GeneratePage() {
       </Typography>
       <Typography color="text.secondary">
         Одна статья пишется несколько минут. Пакет из контент-плана идёт по
-        очереди, тема за темой.
+        очереди, тема за темой. Если вкладка оборвёт ожидание, сервер всё
+        равно дописывает статью — статус виден в «Статьях».
       </Typography>
       <ToggleButtonGroup
         exclusive
@@ -355,7 +397,8 @@ export function GeneratePage() {
           {queue.length > 0 ? (
             <>
               <Typography>
-                Выбрано {selected.length} из {queue.length}. Повторный запуск
+                Выбрано {selected.length} из {queue.length}. Ориентир ожидания:{" "}
+                {estimateMinutes(planFlags, selected.length)}. Повторный запуск
                 напишет выбранные статьи ещё раз.
               </Typography>
               <FlagSwitches
@@ -531,6 +574,9 @@ export function GeneratePage() {
               setFlags((current) => ({ ...current, [name]: checked }));
             }}
           />
+          <Typography color="text.secondary">
+            Ориентир ожидания: {estimateMinutes(flags)}.
+          </Typography>
           <Button type="submit" variant="contained" disabled={generate.isPending}>
             Сгенерировать
           </Button>
@@ -540,7 +586,12 @@ export function GeneratePage() {
               <Typography>Пишу статью. Не закрывайте вкладку.</Typography>
             </Stack>
           ) : null}
-          {generate.error instanceof Error ? (
+          {generate.error instanceof ApiError && generate.error.status === 0 ? (
+            <Alert severity="warning">
+              Ожидание оборвалось. Сервер может ещё писать статью — откройте{" "}
+              <RouterLink to="/articles">Статьи</RouterLink>.
+            </Alert>
+          ) : generate.error instanceof Error ? (
             <Alert severity="error">{generate.error.message}</Alert>
           ) : null}
         </Stack>

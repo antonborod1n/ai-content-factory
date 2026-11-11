@@ -7,9 +7,23 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.db.models.article import Article, ArticleStatus, ReviewStatus
-from app.db.models.project import DEFAULT_PROJECT_ID
+
+_LIST_DEFER = (
+    defer(Article.content_markdown),
+    defer(Article.meta_description),
+    defer(Article.audience),
+    defer(Article.keywords),
+    defer(Article.error_message),
+    defer(Article.pipeline),
+    defer(Article.assets),
+    defer(Article.internal_links),
+    defer(Article.dzen),
+    defer(Article.quality),
+    defer(Article.competitor_sources),
+)
 
 
 class ArticleRepository:
@@ -19,10 +33,10 @@ class ArticleRepository:
         self,
         session: AsyncSession,
         *,
-        project_id: uuid.UUID | None = None,
+        project_id: uuid.UUID,
     ) -> None:
         self._session = session
-        self._project_id = project_id or DEFAULT_PROJECT_ID
+        self._project_id = project_id
 
     async def create(
         self,
@@ -87,6 +101,7 @@ class ArticleRepository:
     ) -> list[Article]:
         statement = (
             select(Article)
+            .options(*_LIST_DEFER)
             .where(Article.project_id == self._project_id)
             .order_by(Article.created_at.desc())
         )

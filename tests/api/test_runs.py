@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_ai_writer
 from app.config import get_settings
+from app.db.models.project import DEFAULT_PROJECT_ID
 from app.repositories.run_repository import RunRepository
 from app.schemas.ai import AIArticleOutput, ArticleWriteInput
 from app.services.ai.mock_writer import MockAIWriter
@@ -149,7 +150,7 @@ async def test_active_runs_and_missing_run(
     assert empty.status_code == 200
     assert empty.json()["total"] == 0
 
-    repository = RunRepository(db_session)
+    repository = RunRepository(db_session, project_id=DEFAULT_PROJECT_ID)
     run = await repository.create(task_type="article", input_json={"topic": "ещё идёт"})
     active = await client.get(f"{RUNS}/active")
     assert active.status_code == 200

@@ -42,6 +42,9 @@ class PipelineTrace(BaseModel):
 
     enabled: bool = True
     steps: list[PipelineStepTrace] = Field(default_factory=list)
+    # Fact-check text for the humanizer when the editor step is skipped.
+    # Not stored on the article.
+    editor_handoff: str = Field(default="", exclude=True)
 
 
 class SeoPlanInput(BaseModel):

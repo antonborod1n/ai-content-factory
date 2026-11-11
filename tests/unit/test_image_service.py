@@ -1,5 +1,7 @@
 """Unit tests for ImageService with MockImageProvider."""
 
+import asyncio
+
 import pytest
 
 from app.core.exceptions import AIConfigurationError, AIProviderError
@@ -119,3 +121,35 @@ async def test_missing_configuration_skips_all() -> None:
 
     assert "IMAGE_PLACEHOLDER_1" in updated
     assert {item.status for item in assets} == {"skipped"}
+
+
+class _SlowImageProvider(MockImageProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.peak = 0
+        self._active = 0
+
+    async def generate(self, prompt: str, *, kind: str) -> bytes:
+        self._active += 1
+        self.peak = max(self.peak, self._active)
+        try:
+            await asyncio.sleep(0.05)
+            return await super().generate(prompt, kind=kind)
+        finally:
+            self._active -= 1
+
+
+@pytest.mark.asyncio
+async def test_images_run_a_few_at_a_time() -> None:
+    provider = _SlowImageProvider()
+    service = ImageService(provider, enabled=True)
+    markdown = "\n".join(
+        f"![Кадр](IMAGE_PLACEHOLDER_{number})" for number in range(1, 5)
+    )
+
+    updated, assets = await service.replace_placeholders(markdown, topic="Матрас")
+
+    assert provider.peak > 1
+    assert provider.peak <= 3
+    assert updated.count("images/image-") == 4
+    assert [item.status for item in assets] == ["completed"] * 4

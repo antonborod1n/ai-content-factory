@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models.discovery import ContentPlan, ContentPlanStatus, ContentPlanTopic
-from app.db.models.project import DEFAULT_PROJECT_ID
 
 
 class DiscoveryRepository:
@@ -20,10 +19,10 @@ class DiscoveryRepository:
         self,
         session: AsyncSession,
         *,
-        project_id: uuid.UUID | None = None,
+        project_id: uuid.UUID,
     ) -> None:
         self._session = session
-        self._project_id = project_id or DEFAULT_PROJECT_ID
+        self._project_id = project_id
 
     async def create(
         self,

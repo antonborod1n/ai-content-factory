@@ -84,6 +84,22 @@ async def test_humanizer_rewrites_markdown() -> None:
     assert result.report.humanizer.applied is True
     assert "Текст звучит естественнее" in result.output.content_markdown
     assert "стиль в порядке" in humanizer.calls[0].detector_notes
+    assert humanizer.calls[0].fact_check_notes == ""
+
+
+@pytest.mark.asyncio
+async def test_humanizer_receives_fact_check_notes() -> None:
+    service, _, humanizer, _ = _service()
+    await service.run(
+        _output(),
+        language="ru",
+        audience="покупатели",
+        use_detectors=False,
+        use_humanizer=True,
+        use_summary=False,
+        fact_check_notes="Вердикт: needs_revision\n1. Гарантия 100 лет",
+    )
+    assert "Гарантия 100 лет" in humanizer.calls[0].fact_check_notes
 
 
 @pytest.mark.asyncio

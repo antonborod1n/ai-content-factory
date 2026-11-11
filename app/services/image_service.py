@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from app.config import get_settings
@@ -18,6 +19,9 @@ from app.services.ai.image_provider import ImageProvider
 from app.services.ai.prompt_loader import render_image_generate_prompt
 
 logger = logging.getLogger(__name__)
+
+# A few images at once: sequential calls dominate article latency.
+_IMAGE_CONCURRENCY = 3
 
 
 class ImageService:
@@ -58,9 +62,18 @@ class ImageService:
             )
             return updated, [_skipped(item) for item in tokens]
 
-        assets: list[GeneratedAsset] = []
-        for index, item in enumerate(tokens):
-            path = asset_relative_path(item.kind, item.number)
+        slots = [
+            (item, asset_relative_path(item.kind, item.number)) for item in tokens
+        ]
+        outcomes: list[GeneratedAsset | None] = [None] * len(slots)
+        configured = True
+        semaphore = asyncio.Semaphore(_IMAGE_CONCURRENCY)
+
+        async def one(index: int) -> None:
+            nonlocal configured
+            if not configured:
+                return
+            item, path = slots[index]
             heading, excerpt, alt = _scene_for_slot(
                 item, topic=topic, title=title
             )
@@ -72,33 +85,46 @@ class ImageService:
                 excerpt=excerpt,
                 title=title,
             )
-            try:
-                data = await self._provider.generate(prompt, kind=item.kind)
-            except AIConfigurationError:
-                logger.info("Image provider is not configured; skipping remaining")
-                assets.extend(_skipped(rest) for rest in tokens[index:])
-                return updated, assets
-            except AIError:
-                logger.warning(
-                    "Image generation failed for %s; keeping placeholder",
-                    item.token,
-                )
-                assets.append(_failed(item, path))
-                continue
+            async with semaphore:
+                if not configured:
+                    return
+                try:
+                    data = await self._provider.generate(prompt, kind=item.kind)
+                except AIConfigurationError:
+                    configured = False
+                    logger.info(
+                        "Image provider is not configured; skipping remaining"
+                    )
+                    return
+                except AIError:
+                    logger.warning(
+                        "Image generation failed for %s; keeping placeholder",
+                        item.token,
+                    )
+                    outcomes[index] = _failed(item, path)
+                    return
             if not data:
-                assets.append(_failed(item, path))
-                continue
-            updated = replace_placeholder(updated, item.token, path)
-            assets.append(
-                GeneratedAsset(
-                    kind=item.kind,
-                    placeholder=item.token,
-                    alt=item.alt,
-                    path=path,
-                    status="completed",
-                    data=data,
-                )
+                outcomes[index] = _failed(item, path)
+                return
+            outcomes[index] = GeneratedAsset(
+                kind=item.kind,
+                placeholder=item.token,
+                alt=item.alt,
+                path=path,
+                status="completed",
+                data=data,
             )
+
+        await asyncio.gather(*(one(index) for index in range(len(slots))))
+        assets: list[GeneratedAsset] = []
+        for index, asset in enumerate(outcomes):
+            item, path = slots[index]
+            if asset is None:
+                assets.append(_skipped(item))
+                continue
+            if asset.status == "completed":
+                updated = replace_placeholder(updated, item.token, path)
+            assets.append(asset)
         logger.info(
             "Images finished completed=%s failed=%s skipped=%s",
             sum(1 for item in assets if item.status == "completed"),

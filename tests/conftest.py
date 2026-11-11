@@ -181,19 +181,19 @@ async def db_session() -> AsyncSession:
 
 @pytest.fixture
 async def article_repository(db_session: AsyncSession) -> ArticleRepository:
-    return ArticleRepository(db_session)
+    return ArticleRepository(db_session, project_id=DEFAULT_PROJECT_ID)
 
 
 @pytest.fixture
 async def document_repository(db_session: AsyncSession) -> DocumentRepository:
-    return DocumentRepository(db_session)
+    return DocumentRepository(db_session, project_id=DEFAULT_PROJECT_ID)
 
 
 @pytest.fixture
 async def research_repository(db_session: AsyncSession) -> ResearchRepository:
-    return ResearchRepository(db_session)
+    return ResearchRepository(db_session, project_id=DEFAULT_PROJECT_ID)
 
 
 @pytest.fixture
 async def discovery_repository(db_session: AsyncSession) -> DiscoveryRepository:
-    return DiscoveryRepository(db_session)
+    return DiscoveryRepository(db_session, project_id=DEFAULT_PROJECT_ID)

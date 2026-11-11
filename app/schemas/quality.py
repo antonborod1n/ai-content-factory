@@ -60,6 +60,7 @@ class HumanizerInput(BaseModel):
     language: str = "ru"
     audience: str = "general"
     detector_notes: str = ""
+    fact_check_notes: str = ""
 
 
 class HumanizerReport(BaseModel):

@@ -4,18 +4,24 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Stack from "@mui/material/Stack";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
 import Typography from "@mui/material/Typography";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import Markdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { useParams } from "react-router-dom";
 
 import { fetchArticle, regenerateImages, setReview } from "../api/articles";
 import type { ReviewStatus } from "../api/types";
 import { ApiError, currentProjectId } from "../api/client";
-import { articleMediaUrl } from "../articleMedia";
+import { articleMediaUrl, safeMarkdownHref } from "../articleMedia";
 import { trackGeneration } from "../generationActivity";
 import { isArticleBusy } from "../hooks/useArticlesInProgress";
 import { reviewLabel, statusLabel } from "../statusLabels";
+
+type ArticleView = "article" | "dzen";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object") {
@@ -24,9 +30,48 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function ArticleMarkdown({
+  articleId,
+  markdown,
+}: {
+  articleId: string;
+  markdown: string;
+}) {
+  return (
+    <Box
+      sx={{
+        "& h1, & h2, & h3": { mt: 2, mb: 1 },
+        "& p": { mb: 1.5 },
+        "& img": { maxWidth: "100%", height: "auto", display: "block", my: 2 },
+      }}
+    >
+      <Markdown
+        rehypePlugins={[rehypeSanitize]}
+        components={{
+          img: ({ src, alt }) => {
+            const media = articleMediaUrl(articleId, src);
+            return media ? <img src={media} alt={alt ?? ""} /> : null;
+          },
+          a: ({ href, children }) => {
+            const safe = safeMarkdownHref(href);
+            return safe ? <a href={safe}>{children}</a> : <>{children}</>;
+          },
+        }}
+      >
+        {markdown}
+      </Markdown>
+    </Box>
+  );
+}
+
 export function ArticleDetailPage() {
   const { articleId } = useParams();
   const queryClient = useQueryClient();
+  const [viewState, setViewState] = useState<{
+    id: string | undefined;
+    view: ArticleView;
+  }>({ id: articleId, view: "article" });
+  const view = viewState.id === articleId ? viewState.view : "article";
   const review = useMutation({
     mutationFn: (reviewStatus: ReviewStatus) =>
       setReview(articleId ?? "", reviewStatus),
@@ -78,6 +123,10 @@ export function ArticleDetailPage() {
   const dzen = asRecord(data.dzen);
   const dzenMarkdown =
     typeof dzen?.content_markdown === "string" ? dzen.content_markdown : "";
+  const dzenTitle = typeof dzen?.title === "string" ? dzen.title : "";
+  const dzenStatus = typeof dzen?.status === "string" ? dzen.status : "";
+  const dzenChars =
+    typeof dzen?.char_count === "number" ? dzen.char_count : null;
   return (
     <Stack spacing={2}>
       <Typography variant="h4" component="h1">
@@ -158,47 +207,43 @@ export function ArticleDetailPage() {
       {images.error instanceof Error ? (
         <Alert severity="error">{images.error.message}</Alert>
       ) : null}
-      {data.content_markdown ? (
-        <Box
-          sx={{
-            "& h1, & h2, & h3": { mt: 2, mb: 1 },
-            "& p": { mb: 1.5 },
-            "& img": { maxWidth: "100%", height: "auto", display: "block", my: 2 },
-          }}
-        >
-          <Markdown
-            components={{
-              img: ({ src, alt }) => (
-                <img src={articleMediaUrl(data.id, src)} alt={alt ?? ""} />
-              ),
-            }}
-          >
-            {data.content_markdown}
-          </Markdown>
-        </Box>
-      ) : (
-        <Alert severity="info">У этой записи ещё нет текста.</Alert>
-      )}
-      {dzenMarkdown ? (
+      <Tabs
+        value={view}
+        onChange={(_event, value: ArticleView) => {
+          setViewState({ id: articleId, view: value });
+        }}
+      >
+        <Tab value="article" label="Статья" />
+        <Tab value="dzen" label="Дзен" />
+      </Tabs>
+      {view === "article" ? (
+        data.content_markdown ? (
+          <ArticleMarkdown articleId={data.id} markdown={data.content_markdown} />
+        ) : (
+          <Alert severity="info">У этой записи ещё нет текста.</Alert>
+        )
+      ) : dzenMarkdown ? (
         <Stack spacing={1}>
           <Typography variant="h5" component="h2">
-            {typeof dzen?.title === "string" && dzen.title
-              ? dzen.title
-              : "Дзен"}
+            Статья для Дзена
           </Typography>
-          <Box sx={{ "& img": { maxWidth: "100%", height: "auto", display: "block", my: 2 } }}>
-            <Markdown
-              components={{
-                img: ({ src, alt }) => (
-                  <img src={articleMediaUrl(data.id, src)} alt={alt ?? ""} />
-                ),
-              }}
-            >
-              {dzenMarkdown}
-            </Markdown>
-          </Box>
+          {dzenTitle ? (
+            <Typography variant="h6" component="p">
+              {dzenTitle}
+            </Typography>
+          ) : null}
+          {dzenChars !== null ? (
+            <Typography color="text.secondary">{dzenChars} символов</Typography>
+          ) : null}
+          <ArticleMarkdown articleId={data.id} markdown={dzenMarkdown} />
         </Stack>
-      ) : null}
+      ) : (
+        <Alert severity="info">
+          {dzenStatus === "failed"
+            ? "Версия для Дзена не записалась."
+            : "Для этой статьи версии Дзена нет."}
+        </Alert>
+      )}
     </Stack>
   );
 }

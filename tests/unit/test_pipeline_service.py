@@ -195,6 +195,32 @@ async def test_fact_checker_sees_writer_draft_and_editor_sees_issues() -> None:
 
 
 @pytest.mark.asyncio
+async def test_humanizer_skips_editor_and_keeps_fact_check_notes() -> None:
+    writer = MockAIWriter(
+        output=AIArticleOutput(
+            title="Черновик",
+            meta_description="Meta",
+            content_markdown="# Черновик\n\nГарантия 100 лет.",
+            word_count=4,
+            url_slug="chernovik",
+        )
+    )
+    editor = MockEditor()
+    fact = MockFactChecker(output=needs_revision_output())
+    service = _pipeline(writer=writer, fact=fact, editor=editor, research=None)
+
+    output, trace = await service.run(_request(use_humanizer=True))
+
+    assert editor.calls == []
+    assert output.title == "Черновик"
+    editor_step = trace.steps[-1]
+    assert editor_step.name is PipelineStepName.EDITOR
+    assert editor_step.status is PipelineStepStatus.SKIPPED
+    assert "Неподтверждённая цифра" in trace.editor_handoff
+    assert "editor_handoff" not in trace.model_dump()
+
+
+@pytest.mark.asyncio
 async def test_disabled_pipeline_raises_configuration_error() -> None:
     service = _pipeline(enabled=False)
     with pytest.raises(AIConfigurationError, match="disabled"):

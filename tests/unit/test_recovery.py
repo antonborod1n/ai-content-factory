@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.core.exceptions import INTERRUPTED_MESSAGE
 from app.db.models.article import ArticleStatus
 from app.db.models.discovery import ContentPlanStatus
+from app.db.models.project import DEFAULT_PROJECT_ID
 from app.db.models.research import ResearchStatus
 from app.repositories.article_repository import ArticleRepository
 from app.repositories.discovery_repository import DiscoveryRepository
@@ -21,9 +22,9 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_startup_closes_only_unfinished_work(db_session: AsyncSession) -> None:
-    articles = ArticleRepository(db_session)
-    research = ResearchRepository(db_session)
-    runs = RunRepository(db_session)
+    articles = ArticleRepository(db_session, project_id=DEFAULT_PROJECT_ID)
+    research = ResearchRepository(db_session, project_id=DEFAULT_PROJECT_ID)
+    runs = RunRepository(db_session, project_id=DEFAULT_PROJECT_ID)
 
     busy = await articles.create(topic="зависшая", status=ArticleStatus.PROCESSING)
     waiting = await articles.create(topic="ожидает", status=ArticleStatus.PENDING)
@@ -118,8 +119,8 @@ async def test_startup_closes_only_unfinished_work(db_session: AsyncSession) -> 
 async def test_saved_topic_plan_appears_in_history(
     db_session: AsyncSession,
 ) -> None:
-    plans = DiscoveryRepository(db_session)
-    runs = RunRepository(db_session)
+    plans = DiscoveryRepository(db_session, project_id=DEFAULT_PROJECT_ID)
+    runs = RunRepository(db_session, project_id=DEFAULT_PROJECT_ID)
     plan = await plans.create(
         niche="освещение",
         seeds=["светодиодный светильник"],

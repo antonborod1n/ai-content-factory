@@ -23,5 +23,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 EXPOSE 8000
 
-# Apply migrations before serving so a fresh database is always usable.
+# One uvicorn process only: on startup recovery marks interrupted work failed.
+# Do not pass --workers > 1 — a second process would kill the first's jobs.
 CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

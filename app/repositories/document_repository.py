@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.db.models.document import Chunk, Document, DocumentStatus
-from app.db.models.project import DEFAULT_PROJECT_ID
 from app.schemas.rag import RetrievedChunk
 
 
@@ -20,10 +20,10 @@ class DocumentRepository:
         self,
         session: AsyncSession,
         *,
-        project_id: uuid.UUID | None = None,
+        project_id: uuid.UUID,
     ) -> None:
         self._session = session
-        self._project_id = project_id or DEFAULT_PROJECT_ID
+        self._project_id = project_id
 
     async def create(
         self,
@@ -73,6 +73,7 @@ class DocumentRepository:
     async def list(self, *, limit: int = 100, offset: int = 0) -> list[Document]:
         statement = (
             select(Document)
+            .options(defer(Document.content_text))
             .where(Document.project_id == self._project_id)
             .order_by(Document.created_at.desc())
             .limit(limit)
@@ -80,6 +81,28 @@ class DocumentRepository:
         )
         result = await self._session.execute(statement)
         return list(result.scalars().all())
+
+    async def list_with_chunk_counts(
+        self, *, limit: int = 100, offset: int = 0
+    ) -> list[tuple[Document, int]]:
+        """One query for the catalog: documents plus chunk counts, no body text."""
+        chunk_total = (
+            select(func.count())
+            .select_from(Chunk)
+            .where(Chunk.document_id == Document.id)
+            .correlate(Document)
+            .scalar_subquery()
+        )
+        statement = (
+            select(Document, chunk_total.label("chunk_count"))
+            .options(defer(Document.content_text))
+            .where(Document.project_id == self._project_id)
+            .order_by(Document.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self._session.execute(statement)
+        return [(row.Document, int(row.chunk_count or 0)) for row in result.all()]
 
     async def count(self) -> int:
         result = await self._session.execute(

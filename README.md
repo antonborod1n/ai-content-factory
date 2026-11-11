@@ -81,7 +81,10 @@ On Windows, Hyper-V may reserve 5432/5678/5173 — Compose and Vite use
 15432/15678/15173 on the host instead.
 Compose publishes API, Postgres, n8n, and the operator UI on `127.0.0.1`
 only. There is no API auth yet — do not expose these ports beyond this
-machine without a reverse proxy and authentication.
+machine without a reverse proxy and authentication. Run a **single**
+uvicorn process for `app` (the Dockerfile CMD already does): startup
+recovery marks in-flight articles as failed, so a second worker would
+interrupt the first.
 Stop containers: `docker compose down` from the repo root.
 
 ## Local development

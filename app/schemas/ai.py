@@ -132,6 +132,18 @@ class ArticleWriteInput(BaseModel):
             "outline": self.outline,
         }
 
+    def section_brief_for_prompt(self) -> dict:
+        """Short plan for one section. Scalars already sit in the prompt header."""
+        return {
+            "outline": self.outline,
+            "primary_keywords": self.primary_keywords,
+            "secondary_keywords": self.secondary_keywords,
+            "include_tables": self.include_tables,
+            "include_lists": self.include_lists,
+            "include_faq": self.include_faq,
+            "faq_count": self.faq_count,
+        }
+
 
 class CompetitorPlanOutput(BaseModel):
     """Improved outline and SEO hints from competitor analysis."""
